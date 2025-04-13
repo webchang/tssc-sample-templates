@@ -17,6 +17,8 @@ spec:
       description: |
         Secret of basic-auth type containing credentials to commit into gitops repository.
     - name: git-url
+      type: string
+      default: "unknown to taskrun"
   workspaces:
     - name: gitops-auth
       optional: true
