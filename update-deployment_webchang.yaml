@@ -80,6 +80,10 @@ spec:
         }
         echo "Successfully updated development image from ${old_image} to ${PARAM_IMAGE}"
 
-        echo "***[webchang] contents of /workspace"
-        ls -la /workspace
+        echo "\n***[rong] contents of /workspace/gitops-auth"
+        ls -la /workspace/gitops-auth
+        echo "------"
+
+        echo "\n***[rong] list all env variables"
+        env
         echo "------"
