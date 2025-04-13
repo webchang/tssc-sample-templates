@@ -84,6 +84,17 @@ spec:
         old_image=$(yq "${IMAGE_PATH}" "${deployment_patch_filepath}")
         yq e -i "${IMAGE_PATH} |= \"${PARAM_IMAGE}\"" "${deployment_patch_filepath}"
 
+        echo "*** Add source code URL and revision to .metadata.annotations"
+        echo "*** Source repo URL: $PARAM_URL"
+        echo "*** Source repo revision: $PARAM_REVISION"
+
+        export PARAM_URL
+        export PARAM_REVISION
+        yq -i '
+          .metadata.annotations += {"redhat.com/source/url": strenv(PARAM_URL)} |
+          .metadata.annotations += {"redhat.com/source/revision": strenv(PARAM_URL)}
+        ' z.yaml
+
         git add .
         git commit -m "Update '${component_name}' component image to: ${PARAM_IMAGE}"
         git push 2> /dev/null || \
@@ -108,10 +119,4 @@ spec:
  
         echo "***[rong] contents of $PWD"
         ls -la $PWD
-        echo "------"
-
-        echo "***[rong] env PARAM_URL: $PARAM_URL"
-        echo "------"
-
-        echo "***[rong] env PARAM_REVISION: $PARAM_REVISION"
         echo "------"
