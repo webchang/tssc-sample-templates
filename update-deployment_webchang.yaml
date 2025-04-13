@@ -31,8 +31,6 @@ spec:
           value: $(workspaces.gitops-auth.bound)
         - name: WORKSPACE_GITOPS_AUTH_DIRECTORY_PATH
           value: $(workspaces.gitops-auth.path)
-        - name: SOURCE_REPO_URL
-          value: $(params.url)
       script: |
 
         if [ "${WORKSPACE_GITOPS_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
@@ -82,4 +80,6 @@ spec:
         }
         echo "Successfully updated development image from ${old_image} to ${PARAM_IMAGE}"
 
-        echo "***[webchang] source URL is: ${SOURCE_REPO_URL}"
+        echo "***[webchang] contents of /workspace/output/source"
+        ls -la /workspace/output/source
+        echo "------"
