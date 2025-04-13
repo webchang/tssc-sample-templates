@@ -16,6 +16,7 @@ spec:
       default: gitops-auth-secret
       description: |
         Secret of basic-auth type containing credentials to commit into gitops repository.
+    - name: git-url
   workspaces:
     - name: gitops-auth
       optional: true
@@ -31,6 +32,8 @@ spec:
           value: $(workspaces.gitops-auth.bound)
         - name: WORKSPACE_GITOPS_AUTH_DIRECTORY_PATH
           value: $(workspaces.gitops-auth.path)
+        - name: GIT_URL
+          value: $(params.git-url)
       script: |
 
         if [ "${WORKSPACE_GITOPS_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
@@ -94,4 +97,7 @@ spec:
  
         echo "***[rong] contents of $PWD"
         ls -la $PWD
+        echo "------"
+
+        echo "***[rong] value of env GIT_URL: $GIT_URL"
         echo "------"
