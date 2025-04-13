@@ -43,7 +43,7 @@ spec:
           value: $(workspaces.gitops-auth.path)
         - name: PARAM_URL
           value: $(params.git-url)
-        - name: PARAM_REVISION
+        - name: PARAM_REV
           value: $(params.revision)
       script: |
 
@@ -86,13 +86,13 @@ spec:
 
         echo "*** Add source code URL and revision to .metadata.annotations"
         echo "*** Source repo URL: $PARAM_URL"
-        echo "*** Source repo revision: $PARAM_REVISION"
+        echo "*** Source repo revision: $PARAM_REV"
 
-        export PARAM_URL
-        export PARAM_REVISION
+        export SRC_REPO_URL="$PARAM_URL"
+        export SRC_REPO_REV="$PARAM_REV"
         yq -i '
-          .metadata.annotations += {"redhat.com/source/url": strenv(PARAM_URL)} |
-          .metadata.annotations += {"redhat.com/source/revision": strenv(PARAM_URL)}
+          .metadata.annotations += {"redhat.com/source/url": strenv(SRC_REPO_URL)} |
+          .metadata.annotations += {"redhat.com/source/revision": strenv(SRC_REPO_REV)}
         ' "${deployment_patch_filepath}"
 
         git add .
