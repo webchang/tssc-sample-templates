@@ -80,10 +80,18 @@ spec:
         }
         echo "Successfully updated development image from ${old_image} to ${PARAM_IMAGE}"
 
-        echo "\n***[rong] contents of /workspace/gitops-auth"
+        echo "***[rong] contents of /workspace/gitops-auth"
         ls -la /workspace/gitops-auth
         echo "------"
 
-        echo "\n***[rong] list all env variables"
+        echo "***[rong] list all env variables"
         env
+        echo "------"
+
+        echo "***[rong] contents of /"
+        ls -la /
+        echo "------"
+ 
+         echo "***[rong] contents of /py3src"
+        ls -la /py3src
         echo "------"
