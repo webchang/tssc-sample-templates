@@ -18,7 +18,14 @@ spec:
         Secret of basic-auth type containing credentials to commit into gitops repository.
     - name: git-url
       type: string
-      default: "unknown to taskrun"
+      default: "undefined"
+      description: |
+        This is a PipelineRun parameter recording source repo URL.
+    - name: revision
+      type: string
+      default: "undefined"
+      description: |
+        This is a PipelineRun parameter recording source repo revision.
   workspaces:
     - name: gitops-auth
       optional: true
@@ -34,8 +41,10 @@ spec:
           value: $(workspaces.gitops-auth.bound)
         - name: WORKSPACE_GITOPS_AUTH_DIRECTORY_PATH
           value: $(workspaces.gitops-auth.path)
-        - name: GIT_URL
+        - name: PARAM_GIT-URL
           value: $(params.git-url)
+        - name: PARAM_REVISION
+          value: $(params.revision)
       script: |
 
         if [ "${WORKSPACE_GITOPS_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
@@ -101,5 +110,8 @@ spec:
         ls -la $PWD
         echo "------"
 
-        echo "***[rong] value of env GIT_URL: $GIT_URL"
+        echo "***[rong] env PARAM_GIT-URL: $PARAM_GIT-URL"
+        echo "------"
+
+        echo "***[rong] env PARAM_REVISION: $PARAM_REVISION"
         echo "------"
