@@ -80,6 +80,6 @@ spec:
         }
         echo "Successfully updated development image from ${old_image} to ${PARAM_IMAGE}"
 
-        echo "***[webchang] contents of /workspace/output/source"
-        ls -la /workspace/output/source
+        echo "***[webchang] contents of /workspace"
+        ls -la /workspace
         echo "------"
