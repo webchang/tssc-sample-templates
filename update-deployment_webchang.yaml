@@ -18,12 +18,10 @@ spec:
         Secret of basic-auth type containing credentials to commit into gitops repository.
     - name: git-url
       type: string
-      default: "undefined"
       description: |
         This is a PipelineRun parameter recording source repo URL.
     - name: revision
       type: string
-      default: "undefined"
       description: |
         This is a PipelineRun parameter recording source repo revision.
   workspaces:
