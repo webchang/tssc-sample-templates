@@ -31,10 +31,14 @@ spec:
           value: $(params.git-url)
         - name: IMAGE_URL
           value: $(params.image-url)
+        - name: IMAGE_DIGEST
+          value: $(tasks.build-container.results.IMAGE_DIGEST)
         - name: BUILD_TASK_STATUS
           value: $(params.build-task-status)
         - name: SOURCE_BUILD_RESULT_FILE
           value: "$(workspaces.workspace.path)/source_build_result.json"
+        - name: WORKSPACE_CONCERT_API
+          value: $(workspaces.concert-api.path)
       script: |
         #!/usr/bin/env bash
         echo
@@ -45,6 +49,8 @@ spec:
         echo "Build repository: $GIT_URL"
         if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
           echo "Generated Image is in : $IMAGE_URL"
+          echo
+          echo "Image digest: $IMAGE_DIGEST"
         fi
         if [ -e "$SOURCE_BUILD_RESULT_FILE" ]; then
           url=$(jq -r ".image_url" <"$SOURCE_BUILD_RESULT_FILE")
@@ -55,10 +61,14 @@ spec:
           echo "------"
         fi
 
+        echo "concert-api keys"
+        ls ${WORKSPACE_CONCERT_API}
+
         echo "concert-api: key-type"
-        cat "$(workspaces.concert-api.key-type)"
+        cat ${WORKSPACE_CONCERT_API}/key-type
         echo "------"
 
+        apt-get install iputils-ping
         echo "Reachability test: rong1.fyre.ibm.com"
         ping -c 3 rong1.fyre.ibm.com
         if [[ $? == 0 ]]; then
