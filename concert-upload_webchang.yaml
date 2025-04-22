@@ -1,0 +1,71 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: "konflux"
+  name: concert-upload
+spec:
+  description: >-
+    Upload data to Concert.
+  params:
+    - name: git-url
+      description: Git URL
+    - name: image-url
+      description: Image URL
+    - name: build-task-status
+      value: $(tasks.build-container.status)
+  workspaces:
+    - name: concert-api
+      description: Concert API endpoint and credentials
+    - name: workspace
+      description: The workspace where source code is included.
+      optional: true
+  steps:
+    - name: upload-concertdef-build
+      image: icr.io/cpopen/ibm-concert-toolkit:latest
+      env:
+        - name: GIT_URL
+          value: $(params.git-url)
+        - name: IMAGE_URL
+          value: $(params.image-url)
+        - name: BUILD_TASK_STATUS
+          value: $(params.build-task-status)
+        - name: SOURCE_BUILD_RESULT_FILE
+          value: "$(workspaces.workspace.path)/source_build_result.json"
+      script: |
+        #!/usr/bin/env bash
+        echo
+        echo "*** Runs inside Concert Toolkit container"
+        echo
+        echo "Upload ConcertDef Build Inventory"
+        echo
+        echo "Build repository: $GIT_URL"
+        if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
+          echo "Generated Image is in : $IMAGE_URL"
+        fi
+        if [ -e "$SOURCE_BUILD_RESULT_FILE" ]; then
+          url=$(jq -r ".image_url" <"$SOURCE_BUILD_RESULT_FILE")
+          echo "Generated Source Image is in : $url"
+          echo
+          echo "Contents of $SOURCE_BUILD_RESULT_FILE"
+          cat $SOURCE_BUILD_RESULT_FILE
+          echo "------"
+        fi
+
+        echo "concert-api: key-type"
+        cat "$(workspaces.concert-api.key-type)"
+        echo "------"
+
+        echo "Reachability test: rong1.fyre.ibm.com"
+        ping -c 3 rong1.fyre.ibm.com
+        if [[ $? == 0 ]]; then
+          echo "Target Concert service is reachable"
+        else
+          echo "Target Concert service is not reachable"
+        fi
+
+        echo
+        echo End Summary
