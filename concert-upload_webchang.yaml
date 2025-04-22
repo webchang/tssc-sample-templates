@@ -39,8 +39,20 @@ spec:
           value: "$(workspaces.workspace.path)/source_build_result.json"
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
+        - name: WORKSPACE
+          value: $(workspaces.workspace.path)
       script: |
         #!/usr/bin/env bash
+        echo 
+        echo "uid, gid, etc. via id"
+        id
+        echo "------"
+
+        echo "cd $WORKSPACE; cd $WORKSPACE
+        echo $PWD
+        ls -la .
+        echo "------"
+
         echo
         echo "Upload ConcertDef Build Inventory"
         echo
@@ -59,15 +71,7 @@ spec:
           echo "------"
         fi
 
-        echo
-        echo "ls ${WORKSPACE_CONCERT_API}"
-        ls ${WORKSPACE_CONCERT_API}
-        echo "------"
-        echo "key-type: $(cat ${WORKSPACE_CONCERT_API}/key-type)"
-        echo "instance-id: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"
-        echo "endpoint-url: $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)"
-
-        curl --verbose -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1
+        curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1
 
         if [[ $? == 0 ]]; then
           echo "Target Concert service is reachable"
