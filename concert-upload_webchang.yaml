@@ -61,10 +61,10 @@ spec:
           echo "------"
         fi
 
-        echo "Concert endpoint-url:"
+        echo "Concert endpoint-url: https://9.46.254.63:12443"
         cat ${WORKSPACE_CONCERT_API}/endpoint-url
 
-        curl -k $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)
+        curl -k https://9.46.254.63:12443
 
         # curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
 
