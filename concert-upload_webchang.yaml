@@ -61,7 +61,7 @@ spec:
 
         echo
         echo "ls ${WORKSPACE_CONCERT_API}"
-        ls ${WORKSPACE_CONCERT_API}"
+        ls ${WORKSPACE_CONCERT_API}
         echo "------"
         echo "instance-id: "$(cat ${WORKSPACE_CONCERT_API}/instance-id)"
         echo "endpoint-url: "$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)"
