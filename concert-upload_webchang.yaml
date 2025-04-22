@@ -26,6 +26,8 @@ spec:
   steps:
     - name: upload-concertdef-build
       image: icr.io/cpopen/ibm-concert-toolkit:latest
+      # securityContext:
+      #   runAsUser: 0
       env:
         - name: GIT_URL
           value: $(params.git-url)
@@ -53,6 +55,11 @@ spec:
         ls -la /
         echo "------"
 
+        echo
+        echo "ls -la /toolkit-data"
+        ls -la /
+        echo "------"
+
         echo "cd $WORKSPACE"
         cd $WORKSPACE; echo $PWD
         ls -la .
@@ -60,7 +67,7 @@ spec:
 
         echo
         echo "ls -la $WORKSPACE/source"
-        ls -la
+        ls -la $WORKSPACE/source
         echo "------"
 
         echo
@@ -88,6 +95,11 @@ spec:
         else
           echo "Target Concert service is not reachable"
         fi
+
+        cp ${WORKSPACE_CONCERT_API}/key-type tmp.txt
+        echo "show tmp.txt"
+        cat tmp.txt
+        echo "------"
 
         # curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
 
