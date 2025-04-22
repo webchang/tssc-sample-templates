@@ -61,7 +61,12 @@ spec:
           echo "------"
         fi
 
-        curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
+        echo "Concert endpoint-url:"
+        cat ${WORKSPACE_CONCERT_API}/endpoint-url
+
+        curl -k $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)
+
+        # curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
 
         if [[ $? == 0 ]]; then
           echo "Target Concert service is reachable"
