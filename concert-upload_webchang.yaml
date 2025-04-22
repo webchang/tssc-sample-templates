@@ -59,7 +59,25 @@ spec:
           echo "------"
         fi
 
-        curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications
+        echo
+        echo "ls ${WORKSPACE_CONCERT_API}"
+        ls ${WORKSPACE_CONCERT_API}"
+        echo "------"
+        echo "instance-id: "$(cat ${WORKSPACE_CONCERT_API}/instance-id)"
+        echo "endpoint-url: "$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)"
+
+        curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications -o out.json
+
+        if [[ $? == 0 ]]; then
+          echo "Target Concert service is reachable"
+        else
+          echo "Target Concert service is not reachable"
+        fi
+
+        echo
+        echo "cat out.json:"
+        cat out.json
+        echo "------"
 
         # curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
 
