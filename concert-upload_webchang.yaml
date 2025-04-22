@@ -48,9 +48,19 @@ spec:
         id
         echo "------"
 
+        echo
+        echo "ls -la /"
+        ls -la /
+        echo "------"
+
         echo "cd $WORKSPACE"
         cd $WORKSPACE; echo $PWD
         ls -la .
+        echo "------"
+
+        echo
+        echo "ls -la $WORKSPACE/source"
+        ls -la
         echo "------"
 
         echo
