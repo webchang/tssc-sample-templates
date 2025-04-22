@@ -61,16 +61,8 @@ spec:
           echo "------"
         fi
 
-        echo "concert-api keys"
-        ls ${WORKSPACE_CONCERT_API}
+        curl -k "${WORKSPACE_CONCERT_API}/endpoint-url" --silent -o /dev/null
 
-        echo "concert-api: key-type"
-        cat ${WORKSPACE_CONCERT_API}/key-type
-        echo "------"
-
-        apt-get install iputils-ping
-        echo "Reachability test: rong1.fyre.ibm.com"
-        ping -c 3 rong1.fyre.ibm.com
         if [[ $? == 0 ]]; then
           echo "Target Concert service is reachable"
         else
