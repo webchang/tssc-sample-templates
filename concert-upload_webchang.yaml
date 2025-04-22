@@ -48,8 +48,8 @@ spec:
         id
         echo "------"
 
-        echo "cd $WORKSPACE; cd $WORKSPACE
-        echo $PWD
+        echo "cd $WORKSPACE"
+        cd $WORKSPACE; echo $PWD
         ls -la .
         echo "------"
 
