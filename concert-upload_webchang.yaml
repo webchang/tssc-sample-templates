@@ -17,6 +17,7 @@ spec:
       description: Image URL
     - name: build-task-status
       value: $(tasks.build-container.status)
+    - name: event-type
   workspaces:
     - name: concert-api
       description: Concert API endpoint and credentials
@@ -32,24 +33,92 @@ spec:
         - name: GIT_URL
           value: $(params.git-url)
         - name: IMAGE_URL
-          value: $(params.image-url)
+          value: $(tasks.build-container.results.IMAGE_URL)
         - name: IMAGE_DIGEST
           value: $(tasks.build-container.results.IMAGE_DIGEST)
         - name: BUILD_TASK_STATUS
           value: $(params.build-task-status)
-        - name: SOURCE_BUILD_RESULT_FILE
-          value: "$(workspaces.workspace.path)/source_build_result.json"
+        # - name: SOURCE_BUILD_RESULT_FILE
+        #   value: "$(workspaces.workspace.path)/source_build_result.json"
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
           value: $(workspaces.workspace.path)
+        - name: EVENT_TYPE
+          value: $(params.event-type)
+      volumeMounts:
+        - name: shared-folder
+          mountPath: /steps-shared-folder
       script: |
         #!/usr/bin/env bash
-        echo 
-        echo "uid, gid, etc. via id"
-        id
-        echo "------"
 
+        ###
+        # Exit if the task is not triggered by a "push" event
+        #
+        echo "Event type: ${EVENT_TYPE}"
+        if [[ ${EVENT_TYPE} != "push" ]]; then
+          exit 0
+        fi
+
+        ###
+        # Exit if build was not successful
+        #
+        echo "Build repository: $GIT_URL"
+        if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
+          echo
+          echo "Generated Image is in : $IMAGE_URL"
+          echo "Generated Image digest: $IMAGE_DIGEST"
+        else
+          exit 0
+        fi
+        # <rong> The code below is removed since
+        #   $SOURCE_BUILD_RESULT_FILE is not generarted by any task.
+        #
+        # if [ -e "$SOURCE_BUILD_RESULT_FILE" ]; then
+        #   url=$(jq -r ".image_url" <"$SOURCE_BUILD_RESULT_FILE")
+        #   echo "Generated Source Image is in : $url"
+        #   echo
+        #   echo "Contents of $SOURCE_BUILD_RESULT_FILE"
+        #   cat $SOURCE_BUILD_RESULT_FILE
+        #   echo "------"
+        # fi
+
+        ###
+        # Exit if any of the expected ACS files were not generated (due to errors)
+        #
+        ACS_IMAGE_CHECK = "/steps-shared-folder/acs-image-check.json"
+        if [ -s "${ACS_IMAGE_CHECK}" ]; then
+          echo "[acs-image-check.json]"
+          cat ${ACS_IMAGE_CHECK}
+          echo "------"
+        else
+          echo "File empty or not found: ${ACS_IMAGE_CHECK}"
+          exit 0
+        fi
+
+        ACS_IMAGE_SCAN = "/steps-shared-folder/acs-image-scan.json"
+        if [ -s "${ACS_IMAGE_SCAN}" ]; then
+          echo "[acs-image-scan.json]"
+          cat ${ACS_IMAGE_SCAN}
+          echo "------"
+        else
+          echo "File empty or not found: ${ACS_IMAGE_SCAN}"
+          exit 0
+        fi
+
+        ACS_DEPLOY_CHECK = "/steps-shared-folder/acs-deploy-check.json"
+        if [ -s "${ACS_DEPLOY_CHECK}" ]; then
+          echo "[acs-deploy-check.json]"
+          cat ${ACS_DEPLOY_CHECK}
+          echo "------"
+        else
+          echo "File empty or not found: ${ACS_DEPLOY_CHECK}"
+          exit 0
+        fi
+
+        ###
+        # Data checking
+        #
         echo
         echo "ls -la /"
         ls -la /
@@ -60,33 +129,14 @@ spec:
         ls -la /toolkit-data
         echo "------"
 
-        cd $WORKSPACE; echo $PWD
-        ls -la .
-        echo "------"
-
         echo
         echo "ls -la $WORKSPACE/source"
         ls -la $WORKSPACE/source
         echo "------"
 
-        echo
-        echo "Upload ConcertDef Build Inventory"
-        echo
-        echo "Build repository: $GIT_URL"
-        if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
-          echo
-          echo "Generated Image is in : $IMAGE_URL"
-          echo "Image digest: $IMAGE_DIGEST"
-        fi
-        if [ -e "$SOURCE_BUILD_RESULT_FILE" ]; then
-          url=$(jq -r ".image_url" <"$SOURCE_BUILD_RESULT_FILE")
-          echo "Generated Source Image is in : $url"
-          echo
-          echo "Contents of $SOURCE_BUILD_RESULT_FILE"
-          cat $SOURCE_BUILD_RESULT_FILE
-          echo "------"
-        fi
-
+        ###
+        # Reachability checking to the target Concert service instance
+        #
         curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > /dev/null
 
         if [[ $? == 0 ]]; then
