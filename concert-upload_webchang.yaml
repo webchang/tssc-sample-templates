@@ -68,17 +68,19 @@ spec:
         else
           exit 0
         fi
-        # <rong> The code below is removed since
-        #   $SOURCE_BUILD_RESULT_FILE is not generarted by any task.
+
+        ###
+        # Reachability checking to the target Concert service instance
         #
-        # if [ -e "$SOURCE_BUILD_RESULT_FILE" ]; then
-        #   url=$(jq -r ".image_url" <"$SOURCE_BUILD_RESULT_FILE")
-        #   echo "Generated Source Image is in : $url"
-        #   echo
-        #   echo "Contents of $SOURCE_BUILD_RESULT_FILE"
-        #   cat $SOURCE_BUILD_RESULT_FILE
-        #   echo "------"
-        # fi
+        curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
+
+        if [[ $? == 0 ]]; then
+          echo "Target Concert service is reachable"
+        else
+          echo "Target Concert service is not reachable"
+          cat $WORKSPACE/log.txt
+          exit 1
+        fi
 
         ###
         # Data checking
@@ -89,25 +91,9 @@ spec:
         echo "------"
 
         echo
-        echo "ls -la /toolkit-data"
-        ls -la /toolkit-data
-        echo "------"
-
-        echo
         echo "ls -la $WORKSPACE/source"
         ls -la $WORKSPACE/source
         echo "------"
-
-        ###
-        # Reachability checking to the target Concert service instance
-        #
-        curl -X GET -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > /dev/null
-
-        if [[ $? == 0 ]]; then
-          echo "Target Concert service is reachable"
-        else
-          echo "Target Concert service is not reachable"
-        fi
 
         echo
         echo End Summary
