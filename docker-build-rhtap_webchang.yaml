@@ -37,6 +37,8 @@ spec:
           value: $(params.output-image)
         - name: build-task-status
           value: $(tasks.build-container.status)
+        - name: event-type
+          value: $(params.event-type)
       taskRef:
         name: concert-upload
       workspaces:
