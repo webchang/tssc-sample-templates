@@ -46,9 +46,6 @@ spec:
           value: $(workspaces.workspace.path)
         - name: EVENT_TYPE
           value: $(params.event-type)
-      volumeMounts:
-        - name: shared-folder
-          mountPath: /steps-shared-folder
       script: |
         #!/usr/bin/env bash
 
@@ -82,39 +79,6 @@ spec:
         #   cat $SOURCE_BUILD_RESULT_FILE
         #   echo "------"
         # fi
-
-        ###
-        # Exit if any of the expected ACS files were not generated (due to errors)
-        #
-        ACS_IMAGE_CHECK = "/steps-shared-folder/acs-image-check.json"
-        if [ -s "${ACS_IMAGE_CHECK}" ]; then
-          echo "[acs-image-check.json]"
-          cat ${ACS_IMAGE_CHECK}
-          echo "------"
-        else
-          echo "File empty or not found: ${ACS_IMAGE_CHECK}"
-          exit 0
-        fi
-
-        ACS_IMAGE_SCAN = "/steps-shared-folder/acs-image-scan.json"
-        if [ -s "${ACS_IMAGE_SCAN}" ]; then
-          echo "[acs-image-scan.json]"
-          cat ${ACS_IMAGE_SCAN}
-          echo "------"
-        else
-          echo "File empty or not found: ${ACS_IMAGE_SCAN}"
-          exit 0
-        fi
-
-        ACS_DEPLOY_CHECK = "/steps-shared-folder/acs-deploy-check.json"
-        if [ -s "${ACS_DEPLOY_CHECK}" ]; then
-          echo "[acs-deploy-check.json]"
-          cat ${ACS_DEPLOY_CHECK}
-          echo "------"
-        else
-          echo "File empty or not found: ${ACS_DEPLOY_CHECK}"
-          exit 0
-        fi
 
         ###
         # Data checking
