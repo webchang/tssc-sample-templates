@@ -223,8 +223,6 @@ spec:
       params:
         - name: event-type
           value: $(params.event-type)
-        - name: build-task-status
-          value: $(tasks.build-container.status)
         - name: source-url
           value: $(tasks.clone-repository.results.url)
         - name: source-commit
