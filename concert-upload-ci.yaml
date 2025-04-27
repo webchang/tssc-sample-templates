@@ -13,8 +13,6 @@ spec:
   params:
     - name: event-type
       type: string
-    - name: build-task-status
-      type: string
     - name: source-url
       type: string
     - name: source-commit
@@ -47,8 +45,6 @@ spec:
           value: $(params.concert-enabled)
         - name: EVENT_TYPE
           value: $(params.event-type)
-        - name: BUILD_TASK_STATUS
-          value: $(params.build-task-status)
         - name: SOURCE_URL
           value: $(params.source-url)
         - name: SOURCE_COMMIT
@@ -76,15 +72,11 @@ spec:
           exit 0
         fi
 
-        if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
-          echo "Source repo URL: $SOURCE_URL"
-          echo "Source repo commit: $SOURCE_COMMIT"
-          echo "Source repo commit timestamp: $SOURCE_COMMIT_TIMESTAMP"
-          echo "Generated image path+tag: $IMAGE_URL"
-          echo "Generated image digest: $IMAGE_DIGEST"
-        else
-          exit 0
-        fi
+        echo "Source repo URL: $SOURCE_URL"
+        echo "Source repo commit: $SOURCE_COMMIT"
+        echo "Source repo commit timestamp: $SOURCE_COMMIT_TIMESTAMP"
+        echo "Generated image path+tag: $IMAGE_URL"
+        echo "Generated image digest: $IMAGE_DIGEST"
 
         curl --no-progrss-meter -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
 
