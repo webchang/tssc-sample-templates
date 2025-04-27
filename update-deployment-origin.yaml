@@ -16,14 +16,6 @@ spec:
       default: gitops-auth-secret
       description: |
         Secret of basic-auth type containing credentials to commit into gitops repository.
-    - name: git-url
-      type: string
-      description: |
-        This is a PipelineRun parameter recording source repo URL.
-    - name: revision
-      type: string
-      description: |
-        This is a PipelineRun parameter recording source repo revision.
   workspaces:
     - name: gitops-auth
       optional: true
@@ -39,10 +31,6 @@ spec:
           value: $(workspaces.gitops-auth.bound)
         - name: WORKSPACE_GITOPS_AUTH_DIRECTORY_PATH
           value: $(workspaces.gitops-auth.path)
-        - name: PARAM_URL
-          value: $(params.git-url)
-        - name: PARAM_REV
-          value: $(params.revision)
       script: |
 
         if [ "${WORKSPACE_GITOPS_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
@@ -82,26 +70,6 @@ spec:
         old_image=$(yq "${IMAGE_PATH}" "${deployment_patch_filepath}")
         yq e -i "${IMAGE_PATH} |= \"${PARAM_IMAGE}\"" "${deployment_patch_filepath}"
 
-        echo "*** Add source code URL and revision to .metadata.annotations"
-        echo "*** Source repo URL: $PARAM_URL"
-        echo "*** Source repo revision: $PARAM_REV"
-        export PARAM_URL
-        export PARAM_REV
-
-        # add/replace annotation(git_url) for source repo URL
-        #
-        yq -i 'with(.metadata.annotations;
-            with((.[] | select(.git_url)) // (. += {"git_url": strenv(PARAM_URL)}); .git_url = strenv(PARAM_URL))
-          ) |
-          .metadata.annotations.git_url style="double"' "${deployment_patch_filepath}"
-
-        # add/replace annotation (git_rev) for source repo revision
-        #
-        yq -i 'with(.metadata.annotations;
-            with((.[] | select(.git_rev)) // (. += {"git_rev": strenv(PARAM_REV)}); .git_rev = strenv(PARAM_REV))
-          ) |
-          .metadata.annotations.git_rev style="double"' "${deployment_patch_filepath}"
-    
         git add .
         git commit -m "Update '${component_name}' component image to: ${PARAM_IMAGE}"
         git push 2> /dev/null || \
@@ -111,19 +79,3 @@ spec:
           exit 1
         }
         echo "Successfully updated development image from ${old_image} to ${PARAM_IMAGE}"
-
-        echo "***[rong] contents of /workspace/gitops-auth"
-        ls -la /workspace/gitops-auth
-        echo "------"
-
-        echo "***[rong] list all env variables"
-        env
-        echo "------"
-
-        echo "***[rong] contents of /"
-        ls -la /
-        echo "------"
- 
-        echo "***[rong] contents of $PWD"
-        ls -la $PWD
-        echo "------"

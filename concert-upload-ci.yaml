@@ -1,0 +1,154 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: "konflux"
+  name: concert-upload-ci
+spec:
+  description: >-
+    Upload data to Concert.
+  params:
+    - name: event-type
+      type: string
+    - name: build-task-status
+      type: string
+    - name: source-url
+      type: string
+    - name: source-commit
+      type: string
+    - name: source-commit-timestamp
+      type: string
+    - name: image
+      type: string
+    - name: image-digest
+      type: string
+    - name: concert-enabled
+      type: string
+      default: "false"
+    - name: concert-component-name
+      type: string
+    - name: concert-component-version
+      type: string
+      default: "1.0.0"
+  workspaces:
+    - name: concert-api
+      description: Concert API endpoint and credentials
+    - name: workspace
+      description: The workspace where source code is included.
+      optional: true
+  steps:
+    - name: concert-enablement-validation
+      image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
+      env:
+        - name: CONCERT_ENABLED
+          value: $(params.concert-enabled)
+        - name: EVENT_TYPE
+          value: $(params.event-type)
+        - name: BUILD_TASK_STATUS
+          value: $(params.build-task-status)
+        - name: SOURCE_URL
+          value: $(params.source-url)
+        - name: SOURCE_COMMIT
+          type: $(params.source-commit)
+        - name: SOURCE_COMMIT_TIMESTAMP
+          type: $(params.source-commit-timestamp)
+        - name: IMAGE_URL
+          value: $(tasks.build-container.results.IMAGE_URL)
+        - name: IMAGE_DIGEST
+          value: $(tasks.build-container.results.IMAGE_DIGEST)
+        - name: WORKSPACE_CONCERT_API
+          value: $(workspaces.concert-api.path)
+        - name: WORKSPACE
+          value: $(workspaces.workspace.path)
+      script: |
+        #!/usr/bin/env bash
+
+        if [[ ${CONCERT_ENABLED} == "true" ]]; then
+          echo "upload files to Concert"
+        else
+          exit 0
+        fi
+
+        if [[ ${EVENT_TYPE} != "push" ]]; then
+          exit 0
+        fi
+
+        if [ "$BUILD_TASK_STATUS" == "Succeeded" ]; then
+          echo "Source repo URL: $SOURCE_URL"
+          echo "Source repo commit: $SOURCE_COMMIT"
+          echo "Source repo commit timestamp: $SOURCE_COMMIT_TIMESTAMP"
+          echo "Generated image path+tag: $IMAGE_URL"
+          echo "Generated image digest: $IMAGE_DIGEST"
+        else
+          exit 0
+        fi
+
+        curl --no-progrss-meter -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
+
+        if [[ $? == 0 ]]; then
+          echo "Target Concert service is reachable"
+        else
+          echo "Target Concert service is not reachable"
+          cat $WORKSPACE/log.txt
+          exit 1
+        fi
+
+        echo "ls -la $WORKSPACE/source"
+        ls -la $WORKSPACE/source
+        echo "------"
+    - name: upload-concertdef-build
+      image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
+      env:
+        - name: CONCERT_COMPONENT_NAME
+          value: $(params.concert-component-name)
+        - name: CONCERT_COMPONENT_VERSION
+          value: $(params.concert-component-version)
+        - name: SOURCE_URL
+          value: $(params.source-url)
+        - name: SOURCE_COMMIT
+          type: $(params.source-commit)
+        - name: SOURCE_COMMIT_TIMESTAMP
+          type: $(params.source-commit-timestamp)
+        - name: IMAGE_URL
+          value: $(tasks.build-container.results.IMAGE_URL)
+        - name: IMAGE_DIGEST
+          value: $(tasks.build-container.results.IMAGE_DIGEST)
+        - name: WORKSPACE_CONCERT_API
+          value: $(workspaces.concert-api.path)
+        - name: WORKSPACE
+          value: $(workspaces.workspace.path)
+      script: |
+        #!/usr/bin/env bash
+
+        echo "Concert component name: $CONCERT_COMPONENT_NAME"
+        echo "Concert component version: $CONCERT_COMPONENT_VERSION"
+        echo "Concert component build-number: $SOURCE_COMMIT_TIMESTAMP"
+
+        mkdir -p $WORKSPACE/concert
+        export CONCERT_HOME=$WORKSPACE/concert
+
+        export SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        export BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
+        export APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
+        touch ${SBOM_SBOM}
+        touch ${BUILD_SBOM}
+        touch ${APP_SBOM}
+
+        ###
+        # Data checking
+        #
+        echo
+        echo "ls -la $WORKSPACE/source"
+        ls -la $WORKSPACE/source
+        echo "------"
+
+        echo
+        echo "ls -la $WORKSPACE/concert"
+        ls -la $WORKSPACE/concert
+        echo "------"
+
+        echo
+        echo End Summary

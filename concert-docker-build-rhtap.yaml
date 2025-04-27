@@ -29,23 +29,6 @@ spec:
       workspaces:
         - name: workspace
           workspace: workspace
-    - name: concert-upload
-      params:
-        - name: git-url
-          value: $(tasks.clone-repository.results.url)?rev=$(tasks.clone-repository.results.commit)
-        - name: image-url
-          value: $(params.output-image)
-        - name: build-task-status
-          value: $(tasks.build-container.status)
-        - name: event-type
-          value: $(params.event-type)
-      taskRef:
-        name: concert-upload
-      workspaces:
-        - name: concert-api
-          workspace: concert-api
-        - name: workspace
-          workspace: workspace
   params:
     - description: Source Repository URL
       name: git-url
@@ -90,6 +73,10 @@ spec:
     - default: ""
       description: Path to a file with build arguments for buildah, see https://www.mankier.com/1/buildah-build#--build-arg-file
       name: build-args-file
+      type: string
+    - default: "false"
+      description: Concert upload enablement flag
+      name: concert-enabled
       type: string
   results:
     - name: IMAGE_URL
@@ -231,6 +218,45 @@ spec:
           values:
             - pull_request
             - Merge Request
+    - name: concert-upload-ci
+      onError: continue
+      params:
+        - name: event-type
+          value: $(params.event-type)
+        - name: build-task-status
+          value: $(tasks.build-container.status)
+        - name: source-url
+          value: $(tasks.clone-repository.results.url)
+        - name: source-commit
+          value: $(tasks.clone-repository.results.commit)
+        - name: source-commit-timestamp
+          value: $(tasks.clone-repository.results.commit-timestamp)
+        - name: image
+          value: $(tasks.build-container.results.IMAGE_URL)
+        - name: image-digest
+          value: $(tasks.build-container.results.IMAGE_DIGEST)
+        - name: concert-enabled
+          value: $(params.concert-enabled)
+        - name: concert-component-name
+          value: $(params.concert-component-name)
+        - name: concert-component-version
+          value: $(params.concert-component-version)
+      runAfter:
+        - build-container
+      taskRef:
+        kind: Task
+        name: concert-upload-ci
+      when:
+        - input: $(params.event-type)
+          operator: notin
+          values:
+            - pull_request
+            - Merge Request
+      workspaces:
+        - name: concert-api
+          workspace: concert-api
+        - name: workspace
+          workspace: workspace
   workspaces:
     - name: workspace
     - name: git-auth
