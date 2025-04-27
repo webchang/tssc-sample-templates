@@ -43,6 +43,8 @@ spec:
       env:
         - name: CONCERT_ENABLED
           value: $(params.concert-enabled)
+        - name: CONCERT_COMPONENT_NAME
+          value: $(params.concert-component-name)
         - name: EVENT_TYPE
           value: $(params.event-type)
         - name: SOURCE_URL
@@ -52,9 +54,9 @@ spec:
         - name: SOURCE_COMMIT_TIMESTAMP
           type: $(params.source-commit-timestamp)
         - name: IMAGE_URL
-          value: $(tasks.build-container.results.IMAGE_URL)
+          value: $(params.image)
         - name: IMAGE_DIGEST
-          value: $(tasks.build-container.results.IMAGE_DIGEST)
+          value: $(params.image-digest)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -78,7 +80,7 @@ spec:
         echo "Generated image path+tag: $IMAGE_URL"
         echo "Generated image digest: $IMAGE_DIGEST"
 
-        curl --no-progrss-meter -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
+        curl -sS -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
 
         if [[ $? == 0 ]]; then
           echo "Target Concert service is reachable"
@@ -91,6 +93,57 @@ spec:
         echo "ls -la $WORKSPACE/source"
         ls -la $WORKSPACE/source
         echo "------"
+
+        mkdir -p $WORKSPACE/concert
+        CONCERT_HOME=$WORKSPACE/concert
+        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
+        APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
+        touch ${SBOM_SBOM}
+        touch ${BUILD_SBOM}
+        touch ${APP_SBOM}
+        echo "ls -la $CONCERT_HOME"
+        ls -la $CONCERT_HOME
+        echo "------"
+
+    - name: upload-image-sbom
+      image: registry.redhat.io/rhtas/cosign-rhel9:e28487714294d5c205e95da843e86fd28e4d3355d6a4d328a872c62ed0cf5f93@sha256:6fa39582a3d62a2aa5404397bb638fdd0960f9392db659d033d7bacf70bddfb1
+      onError: continue
+      env:
+        - name: CONCERT_COMPONENT_NAME
+          value: $(params.concert-component-name)
+        - name: IMAGE_URL
+          value: $(params.image)
+        - name: WORKSPACE
+          value: $(workspaces.workspace.path)
+      script: |
+        #!/bin/bash
+
+        CONCERT_HOME=$WORKSPACE/concert
+        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        
+        status=-1
+        max_try=5
+        wait_sec=2
+        for run in $(seq 1 $max_try); do
+          status=0
+          cosign download sbom $IMAGE_URL 2>>err > ${CONCERT_HOME}/${SBOM_SBOM}
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            break
+          fi
+          sleep $wait_sec
+        done
+        if [ "$status" -ne 0 ]; then
+            echo "Failed to get SBOM after ${max_try} tries" >&2
+            cat err >&2
+            exit 1
+        fi
+
+        echo "ls -la $CONCERT_HOME"
+        ls -la $CONCERT_HOME
+        echo "------"
+
     - name: upload-concertdef-build
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
@@ -105,9 +158,9 @@ spec:
         - name: SOURCE_COMMIT_TIMESTAMP
           type: $(params.source-commit-timestamp)
         - name: IMAGE_URL
-          value: $(tasks.build-container.results.IMAGE_URL)
+          value: $(params.image)
         - name: IMAGE_DIGEST
-          value: $(tasks.build-container.results.IMAGE_DIGEST)
+          value: $(params.image-digest)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -115,32 +168,19 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        echo "Concert component name: $CONCERT_COMPONENT_NAME"
-        echo "Concert component version: $CONCERT_COMPONENT_VERSION"
-        echo "Concert component build-number: $SOURCE_COMMIT_TIMESTAMP"
-
-        mkdir -p $WORKSPACE/concert
-        export CONCERT_HOME=$WORKSPACE/concert
-
-        export SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
-        export BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
-        export APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
-        touch ${SBOM_SBOM}
-        touch ${BUILD_SBOM}
-        touch ${APP_SBOM}
-
-        ###
-        # Data checking
-        #
-        echo
-        echo "ls -la $WORKSPACE/source"
-        ls -la $WORKSPACE/source
-        echo "------"
-
-        echo
+        CONCERT_HOME=$WORKSPACE/concert
         echo "ls -la $WORKSPACE/concert"
         ls -la $WORKSPACE/concert
         echo "------"
 
-        echo
-        echo End Summary
+        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+
+        if [ -s ${SBOM_SBOM} ]; then
+          echo "image SBOM is available at: ${SBOM_SBOM}"
+        else
+          echo "image SBOM is not available"
+        fi
+
+        echo "Concert component name: $CONCERT_COMPONENT_NAME"
+        echo "Concert component version: $CONCERT_COMPONENT_VERSION"
+        echo "Concert component build-number: $SOURCE_COMMIT_TIMESTAMP"
