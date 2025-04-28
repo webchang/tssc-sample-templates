@@ -46,9 +46,9 @@ spec:
         - name: SOURCE_URL
           value: $(params.source-url)
         - name: SOURCE_COMMIT_PATH
-          type: $(params.source-commit-path)
+          value: $(params.source-commit-path)
         - name: SOURCE_COMMIT_TIMESTAMP_PATH
-          type: $(params.source-commit-timestamp-path)
+          value: $(params.source-commit-timestamp-path)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
@@ -129,7 +129,7 @@ spec:
         wait_sec=2
         for run in $(seq 1 $max_try); do
           status=0
-          cosign download sbom $IMAGE_URL 2>>err > ${CONCERT_HOME}/${SBOM_SBOM}
+          cosign download sbom $IMAGE_URL 2>>err > ${SBOM_SBOM}
           status=$?
           if [ "$status" -eq 0 ]; then
             break
@@ -154,9 +154,9 @@ spec:
         - name: SOURCE_URL
           value: $(params.source-url)
         - name: SOURCE_COMMIT_PATH
-          type: $(params.source-commit-path)
+          value: $(params.source-commit-path)
         - name: SOURCE_COMMIT_TIMESTAMP_PATH
-          type: $(params.source-commit-timestamp-path)
+          value: $(params.source-commit-timestamp-path)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
