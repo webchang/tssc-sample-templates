@@ -70,9 +70,10 @@ spec:
           exit 0
         fi
 
+        TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "Source repo URL: $SOURCE_URL"
-        echo "Source repo commit: $(cat $SOURCE_COMMIT)"
-        echo "Source repo commit timestamp: $(cat $SOURCE_COMMIT_TIMESTAMP)"
+        echo "Source repo commit: $SOURCE_COMMIT"
+        echo "Source repo commit timestamp: $TIMESTAMP"
         echo "Generated image path+tag: $IMAGE_URL"
         echo "Generated image digest: $IMAGE_DIGEST"
 
@@ -113,6 +114,8 @@ spec:
           value: $(params.source-url)
         - name: IMAGE_URL
           value: $(params.image)
+        - name: WORKSPACE_CONCERT_API
+          value: $(workspaces.concert-api.path)
         - name: WORKSPACE
           value: $(workspaces.workspace.path)
       script: |
@@ -137,14 +140,37 @@ spec:
           sleep $wait_sec
         done
         if [ "$status" -ne 0 ]; then
-            echo "Failed to get SBOM after ${max_try} tries" >&2
-            cat err >&2
-            exit 1
+          echo "Failed to get SBOM after ${max_try} tries" >&2
+          cat err >&2
+          exit 1
         fi
 
-        echo "ls -la $CONCERT_HOME"
-        ls -la $CONCERT_HOME
-        echo "------"
+        if [ ! -s ${SBOM_SBOM} ]; then
+          echo "SBOM file is empty: ${SBOM_SBOM}"
+          exit 0
+        fi
+
+        ###
+        # Upload Image SBOM to Concert
+        #
+        UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+        AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+        AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+        curl -X POST -sS "${UPLOAD_URL}" \
+          -H 'accept: application/json' \
+          -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+          -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \ 
+          -H 'Content-Type: multipart/form-data' \
+          -F "data_type=package_sbom" \
+          -F "filename=@${SBOM_SBOM}" \       
+          2>&1 > $WORKSPACE/log.txt
+
+        if [[ $? == 0 ]]; then
+          echo "Successfully uploaded package SBOM to Concert"
+        else
+          echo "Failed to upload package SBOM to Concert"
+          cat $WORKSPACE/log.txt
+        fi
 
     - name: upload-concertdef-build
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
@@ -176,14 +202,21 @@ spec:
         ls -la $WORKSPACE/concert
         echo "------"
 
-        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
-
-        if [ -s ${SBOM_SBOM} ]; then
-          echo "image SBOM is available at: ${SBOM_SBOM}"
-        else
-          echo "image SBOM is not available"
-        fi
-
         echo "Concert component name: $CONCERT_COMPONENT_NAME"
         echo "Concert component version: $CONCERT_COMPONENT_VERSION"
-        echo "Concert component build-number: $(cat $SOURCE_COMMIT_TIMESTAMP)"
+        TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "Concert component build-number: $TIMESTAMP"
+
+        # Create BOM-LINK for the image CycloneDX SBOM
+        #
+        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        if [ -s ${SBOM_SBOM} ]; then
+          echo "image SBOM is available at: ${SBOM_SBOM}"
+          sbom_num=$(jq '.serialNumber' ${SBOM_SBOM})
+          sbom_ver=$(jq '.version' ${SBOM_SBOM})
+          export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$ver"
+          # add SBOM_LINK to the build SBOM
+          echo "SBOM-LINK: $SBOM_LINK"
+        fi
+
+
