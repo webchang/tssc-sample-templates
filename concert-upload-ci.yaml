@@ -15,9 +15,9 @@ spec:
       type: string
     - name: source-url
       type: string
-    - name: source-commit-path
+    - name: source-commit
       type: string
-    - name: source-commit-timestamp-path
+    - name: source-commit-timestamp
       type: string
     - name: image
       type: string
@@ -45,10 +45,10 @@ spec:
           value: $(params.event-type)
         - name: SOURCE_URL
           value: $(params.source-url)
-        - name: SOURCE_COMMIT_PATH
-          value: $(params.source-commit-path)
-        - name: SOURCE_COMMIT_TIMESTAMP_PATH
-          value: $(params.source-commit-timestamp-path)
+        - name: SOURCE_COMMIT
+          value: $(params.source-commit)
+        - name: SOURCE_COMMIT_TIMESTAMP
+          value: $(params.source-commit-timestamp)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
@@ -71,8 +71,8 @@ spec:
         fi
 
         echo "Source repo URL: $SOURCE_URL"
-        echo "Source repo commit: $(cat $SOURCE_COMMIT_PATH)"
-        echo "Source repo commit timestamp: $(cat $SOURCE_COMMIT_TIMESTAMP_PATH)"
+        echo "Source repo commit: $(cat $SOURCE_COMMIT)"
+        echo "Source repo commit timestamp: $(cat $SOURCE_COMMIT_TIMESTAMP)"
         echo "Generated image path+tag: $IMAGE_URL"
         echo "Generated image digest: $IMAGE_DIGEST"
 
@@ -153,10 +153,10 @@ spec:
           value: $(params.concert-component-version)
         - name: SOURCE_URL
           value: $(params.source-url)
-        - name: SOURCE_COMMIT_PATH
-          value: $(params.source-commit-path)
-        - name: SOURCE_COMMIT_TIMESTAMP_PATH
-          value: $(params.source-commit-timestamp-path)
+        - name: SOURCE_COMMIT
+          value: $(params.source-commit)
+        - name: SOURCE_COMMIT_TIMESTAMP
+          value: $(params.source-commit-timestamp)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
@@ -186,4 +186,4 @@ spec:
 
         echo "Concert component name: $CONCERT_COMPONENT_NAME"
         echo "Concert component version: $CONCERT_COMPONENT_VERSION"
-        echo "Concert component build-number: $(cat $SOURCE_COMMIT_TIMESTAMP_PATH)"
+        echo "Concert component build-number: $(cat $SOURCE_COMMIT_TIMESTAMP)"

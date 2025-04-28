@@ -225,10 +225,10 @@ spec:
           value: $(params.event-type)
         - name: source-url
           value: $(tasks.clone-repository.results.url)
-        - name: source-commit-path
-          value: $(tasks.clone-repository.results.commit.path)
-        - name: source-commit-timestamp-path
-          value: $(tasks.clone-repository.results.commit-timestamp.path)
+        - name: source-commit
+          value: $(tasks.clone-repository.results.commit)
+        - name: source-commit-timestamp
+          value: $(tasks.clone-repository.results.commit-timestamp)
         - name: image
           value: $(tasks.build-container.results.IMAGE_URL)
         - name: image-digest
