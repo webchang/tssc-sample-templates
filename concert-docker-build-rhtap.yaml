@@ -226,9 +226,9 @@ spec:
         - name: source-url
           value: $(tasks.clone-repository.results.url)
         - name: source-commit
-          value: $(tasks.clone-repository.results.commit)
+          value: $(cat $(tasks.clone-repository.results.commit.path))
         - name: source-commit-timestamp
-          value: $(tasks.clone-repository.results.commit-timestamp)
+          value: $(cat $(tasks.clone-repository.results.commit-timestamp.path))
         - name: image
           value: $(tasks.build-container.results.IMAGE_URL)
         - name: image-digest
