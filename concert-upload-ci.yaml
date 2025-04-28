@@ -146,7 +146,7 @@ spec:
         # Upload CycloneDX-formatted image package SBOM to Concert
         #
         echo "CycloneDX SBOM path: ${CYCLONEDX_SBOM}"
-        head -100 ${CYCLONEDX_SBOM}
+        head -150 ${CYCLONEDX_SBOM}
         UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
         AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
         AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
@@ -234,15 +234,15 @@ spec:
         jq --arg code_name ${CONCERT_COMPONENT_NAME} \
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit_sha ${SOURCE_COMMIT} \
-          '.components += {"type": "code", "name": $code_name, "purl": $code_purl, "commit_sha": $code_commit_sha}' \
+          '.components += [{"type": "code", "name": $code_name, "purl": $code_purl, "commit_sha": $code_commit_sha}]' \
           ${BUILD_SBOM} > ${tempfile}
         cp ${tempfile} ${BUILD_SBOM}
+        jq . ${BUILD_SBOM}
 
         ###
         # Upload ConcertDef Build Inventory SBOM
         #
         echo "Contents of ConcertDef Build Inventory SBOM: ${BUILD_SBOM}"
-        jq . ${BUILD_SBOM}
 
         UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
         AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
