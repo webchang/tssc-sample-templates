@@ -235,8 +235,6 @@ spec:
           value: $(tasks.build-container.results.IMAGE_DIGEST)
         - name: concert-enabled
           value: $(params.concert-enabled)
-        - name: concert-component-version
-          value: $(params.concert-component-version)
       runAfter:
         - build-container
       taskRef:
