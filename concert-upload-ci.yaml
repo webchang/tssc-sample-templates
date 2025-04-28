@@ -209,16 +209,86 @@ spec:
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "Concert component build-number: $TIMESTAMP"
 
-        # Create BOM-LINK for the image CycloneDX SBOM
+        BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
+
+        tempfile=$(mktemp)
+        jq --arg timestamp ${TIMESTAMP} \
+          --arg component_name ${CONCERT_COMPONENT_NAME} \
+          --arg component_version ${CONCERT_COMPONENT_VERSION} \
+          --arg build_number ${TIMESTAMP} \
+          --arg container_name ${IMAGE_URL} \
+          --arg container_uri "${IMAGE_URL}@${IMAGE_DIGEST}" \
+          -n '
+{
+  "bomFormat": "ConcertDef",
+  "specVersion": "1.0.2",
+  "metadata": {
+    "timestamp": $timestamp,
+    "type": "build",
+    "component": {
+      "name": $component_name,
+      "version": $component_version,
+      "build-number": $build_number
+    }
+  },
+  "components": [
+    {
+      "type": "container",
+      "name": $container_name,
+      "uri": $container_uri
+    }
+  ]
+}' > $tempfile
+        cp ${tempfile} ${BUILD_SBOM}
+
+        # Add BOM-LINK for the image CycloneDX SBOM
         #
         SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
         if [ -s ${SBOM_SBOM} ]; then
           echo "image SBOM is available at: ${SBOM_SBOM}"
           sbom_num=$(jq '.serialNumber' ${SBOM_SBOM})
           sbom_ver=$(jq '.version' ${SBOM_SBOM})
-          export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$ver"
-          # add SBOM_LINK to the build SBOM
-          echo "SBOM-LINK: $SBOM_LINK"
+          export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$sbom_ver"
+          echo "BOM-LINK of SBOM: ${SBOM_LINK}"
+
+          jq --arg sbom_link ${SBOM_LINK} \
+            '.components[0].cyclonedx-bom-link = $sbom_link' 
+            ${BUILD_SBOM} > ${tempfile}
+          
+          cp ${tempfile} ${BUILD_SBOM}
         fi
 
+        jq --arg code_name ${CONCERT_COMPONENT_NAME} \
+          --arg code_purl ${SOURCE_URL} \
+          --arg code_commit_sha ${SOURCE_COMMIT} \
+          '.components[.components | length] |= . +
+{
+  "type": "code",
+  "name": $code_name,
+  "purl": $code_purl,
+  "commit_sha": $code_commit_sha
+}' ${BUILD_SBOM} > ${tempfile}
 
+        cp ${tempfile} ${BUILD_SBOM}
+
+        echo "build.json: ${BUILD_SBOM}"
+        cat ${BUILD_SBOM}
+
+        UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+        AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+        AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+        curl -X POST -sS "${UPLOAD_URL}" \
+          -H 'accept: application/json' \
+          -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+          -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
+          -H 'Content-Type: multipart/form-data' \
+          -F "data_type=application_sbom" \
+          -F "filename=@${BUILD_SBOM}" \
+          2>&1 > $WORKSPACE/log.txt
+
+        if [[ $? == 0 ]]; then
+          echo "Successfully uploaded package SBOM to Concert"
+        else
+          echo "Failed to upload package SBOM to Concert"
+          cat $WORKSPACE/log.txt
+        fi
