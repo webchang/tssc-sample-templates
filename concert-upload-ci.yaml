@@ -39,8 +39,6 @@ spec:
     - name: concert-enablement-validation
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
-        - name: CONCERT_ENABLED
-          value: $(params.concert-enabled)
         - name: EVENT_TYPE
           value: $(params.event-type)
         - name: SOURCE_URL
@@ -53,6 +51,8 @@ spec:
           value: $(params.image)
         - name: IMAGE_DIGEST
           value: $(params.image-digest)
+        - name: CONCERT_ENABLED
+          value: $(params.concert-enabled)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -60,14 +60,14 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        if [[ ${CONCERT_ENABLED} == "true" ]]; then
-          echo "upload files to Concert"
-        else
-          exit 0
+        if [[ ${CONCERT_ENABLED} != "true" ]]; then
+          echo "Concert is not enabled"
+          exit 1
         fi
 
         if [[ ${EVENT_TYPE} != "push" ]]; then
-          exit 0
+          echo "Concert task was not trigger by a push event"
+          exit 1
         fi
 
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -87,31 +87,23 @@ spec:
           exit 1
         fi
 
-        echo "ls -la $WORKSPACE/source"
-        ls -la $WORKSPACE/source
-        echo "------"
+        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        if [ ! -s ${PUSH_PIPELINERUN} ]; then
+          echo "PipelineRun file is empty or unavailable: ${PUSH_PIPELINERUN}"
+          exit 1
+        fi
 
-        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
-        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
+        CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+        echo "Concert component and app name: ${CONCERT_COMPONENT_NAME}"
 
         mkdir -p $WORKSPACE/concert
         CONCERT_HOME=$WORKSPACE/concert
-        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
-        BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
-        APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
-        touch ${SBOM_SBOM}
-        touch ${BUILD_SBOM}
-        touch ${APP_SBOM}
-        echo "ls -la $CONCERT_HOME"
-        ls -la $CONCERT_HOME
-        echo "------"
+        echo "Concert home directory: $CONCERT_HOME"
 
     - name: upload-image-sbom
       image: registry.redhat.io/rhtas/cosign-rhel9:e28487714294d5c205e95da843e86fd28e4d3355d6a4d328a872c62ed0cf5f93@sha256:6fa39582a3d62a2aa5404397bb638fdd0960f9392db659d033d7bacf70bddfb1
       onError: continue
       env:
-        - name: SOURCE_URL
-          value: $(params.source-url)
         - name: IMAGE_URL
           value: $(params.image)
         - name: WORKSPACE_CONCERT_API
@@ -121,18 +113,18 @@ spec:
       script: |
         #!/bin/bash
 
-        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
-        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
+        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         CONCERT_HOME=$WORKSPACE/concert
-        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        CYCLONEDX_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
         
         status=-1
         max_try=5
         wait_sec=2
         for run in $(seq 1 $max_try); do
           status=0
-          cosign download sbom $IMAGE_URL 2>>err > ${SBOM_SBOM}
+          cosign download sbom $IMAGE_URL 2>>err > ${CYCLONEDX_SBOM}
           status=$?
           if [ "$status" -eq 0 ]; then
             break
@@ -145,16 +137,16 @@ spec:
           exit 1
         fi
 
-        if [ ! -s ${SBOM_SBOM} ]; then
-          echo "SBOM file is empty: ${SBOM_SBOM}"
-          exit 0
+        if [ ! -s ${CYCLONEDX_SBOM} ]; then
+          echo "SBOM file is empty: ${CYCLONEDX_SBOM}"
+          exit 1
         fi
 
         ###
-        # Upload Image SBOM to Concert
+        # Upload CycloneDX-formatted image package SBOM to Concert
         #
-        echo "SBOM path: ${SBOM_SBOM}"
-        head -50 ${SBOM_SBOM}
+        echo "CycloneDX SBOM path: ${CYCLONEDX_SBOM}"
+        head -50 ${CYCLONEDX_SBOM}
         UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
         AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
         AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
@@ -164,21 +156,20 @@ spec:
           -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
           -H 'Content-Type: multipart/form-data' \
           -F "data_type=package_sbom" \
-          -F "filename=@${SBOM_SBOM}" \
+          -F "filename=@${CYCLONEDX_SBOM}" \
           2>&1 > $WORKSPACE/log.txt
 
         if [[ $? == 0 ]]; then
-          echo "Successfully uploaded package SBOM to Concert"
+          echo "Successfully uploaded image package SBOM to Concert"
         else
-          echo "Failed to upload package SBOM to Concert"
+          echo "Failed to upload image package SBOM to Concert"
           cat $WORKSPACE/log.txt
+          exit 1
         fi
 
-    - name: upload-concertdef-build
+    - name: upload-concertdef-build-app
       image: quay.io/konflux-ci/appstudio-utils:48c311af02858e2422d6229600e9959e496ddef1@sha256:91ddd999271f65d8ec8487b10f3dd378f81aa894e11b9af4d10639fd52bba7e8
       env:
-        - name: CONCERT_COMPONENT_VERSION
-          value: $(params.concert-component-version)
         - name: SOURCE_URL
           value: $(params.source-url)
         - name: SOURCE_COMMIT
@@ -189,6 +180,8 @@ spec:
           value: $(params.image)
         - name: IMAGE_DIGEST
           value: $(params.image-digest)
+        - name: CONCERT_COMPONENT_VERSION
+          value: $(params.concert-component-version)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -196,21 +189,19 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
-        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
-
-        CONCERT_HOME=$WORKSPACE/concert
-        echo "ls -la $WORKSPACE/concert"
-        ls -la $WORKSPACE/concert
-        echo "------"
-
-        echo "Concert component name: $CONCERT_COMPONENT_NAME"
-        echo "Concert component version: $CONCERT_COMPONENT_VERSION"
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "Concert component build-number: $TIMESTAMP"
 
+        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+
+        ###
+        # Generate ConcertDef Build Inventory SBOM
+        #
+        CONCERT_HOME=$WORKSPACE/concert
         BUILD_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-build.json
 
+        # Initialize build inventory SBOM with a container object
+        #
         tempfile=$(mktemp)
         jq --arg timestamp ${TIMESTAMP} \
           --arg component_name ${CONCERT_COMPONENT_NAME} \
@@ -218,61 +209,40 @@ spec:
           --arg build_number ${TIMESTAMP} \
           --arg container_name ${IMAGE_URL} \
           --arg container_uri "${IMAGE_URL}@${IMAGE_DIGEST}" \
-          -n '
-{
-  "bomFormat": "ConcertDef",
-  "specVersion": "1.0.2",
-  "metadata": {
-    "timestamp": $timestamp,
-    "type": "build",
-    "component": {
-      "name": $component_name,
-      "version": $component_version,
-      "build-number": $build_number
-    }
-  },
-  "components": [
-    {
-      "type": "container",
-      "name": $container_name,
-      "uri": $container_uri
-    }
-  ]
-}' > $tempfile
+          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "build", "component": {"name": $component_name, "version": $component_version, "build-number": $build_number}}, "components": [{"type": "container", "name": $container_name, "uri": $container_uri}]}' \
+          > $tempfile
         cp ${tempfile} ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
         #
-        SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
-        if [ -s ${SBOM_SBOM} ]; then
-          echo "image SBOM is available at: ${SBOM_SBOM}"
-          sbom_num=$(jq '.serialNumber' ${SBOM_SBOM})
-          sbom_ver=$(jq '.version' ${SBOM_SBOM})
+        CYCLONEDX_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
+        if [ -s ${CYCLONEDX_SBOM} ]; then
+          echo "image SBOM is available at: ${CYCLONEDX_SBOM}"
+          sbom_num=$(jq '.serialNumber' ${CYCLONEDX_SBOM})
+          sbom_ver=$(jq '.version' ${CYCLONEDX_SBOM})
           export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$sbom_ver"
           echo "BOM-LINK of SBOM: ${SBOM_LINK}"
 
           jq --arg sbom_link ${SBOM_LINK} \
-            '.components[0].cyclonedx-bom-link = $sbom_link' 
+            '.components[0].cyclonedx-bom-link = $sbom_link' \
             ${BUILD_SBOM} > ${tempfile}
-          
           cp ${tempfile} ${BUILD_SBOM}
         fi
 
+        # Add a code object to the build inventory SBOM
+        #
         jq --arg code_name ${CONCERT_COMPONENT_NAME} \
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit_sha ${SOURCE_COMMIT} \
-          '.components[.components | length] |= . +
-{
-  "type": "code",
-  "name": $code_name,
-  "purl": $code_purl,
-  "commit_sha": $code_commit_sha
-}' ${BUILD_SBOM} > ${tempfile}
-
+          '.components[.components | length] |= . + {"type": "code", "name": $code_name, "purl": $code_purl, "commit_sha": $code_commit_sha}' \
+          ${BUILD_SBOM} > ${tempfile}
         cp ${tempfile} ${BUILD_SBOM}
 
-        echo "build.json: ${BUILD_SBOM}"
-        cat ${BUILD_SBOM}
+        ###
+        # Upload ConcertDef Build Inventory SBOM
+        #
+        echo "Contents of ConcertDef Build Inventory SBOM: ${BUILD_SBOM}"
+        jq . ${BUILD_SBOM}
 
         UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
         AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
@@ -287,8 +257,46 @@ spec:
           2>&1 > $WORKSPACE/log.txt
 
         if [[ $? == 0 ]]; then
-          echo "Successfully uploaded package SBOM to Concert"
+          echo "Successfully uploaded ConcertDef Build Inventory SBOM to Concert"
         else
-          echo "Failed to upload package SBOM to Concert"
+          echo "Failed to upload ConcertDef Build Inventory SBOM to Concert"
+          cat $WORKSPACE/log.txt
+        fi
+
+        ###
+        # Generate ConcertDef Application Blueprint SBOM
+        #
+        APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
+
+        tempfile=$(mktemp)
+        jq --arg timestamp ${TIMESTAMP} \
+          --arg component_name ${CONCERT_COMPONENT_NAME} \
+          --arg component_version ${CONCERT_COMPONENT_VERSION} \
+          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "application", "component": {"name": $component_name, "version": $component_version}, "business": {"name": $component_name, "units": [{"name": $component_name}]}}, "components": [{"type": "build", "name": $component_name, "version": $component_version}]}' \
+          > $tempfile
+        cp ${tempfile} ${APP_SBOM}
+
+        ###
+        # Upload ConcertDef Application Blueprint SBOM
+        #
+        echo "Contents of ConcertDef Application Blueprint SBOM: ${APP_SBOM}"
+        jq . ${APP_SBOM}
+
+        UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+        AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+        AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+        curl -X POST -sS "${UPLOAD_URL}" \
+          -H 'accept: application/json' \
+          -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+          -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
+          -H 'Content-Type: multipart/form-data' \
+          -F "data_type=application_sbom" \
+          -F "filename=@${APP_SBOM}" \
+          2>&1 > $WORKSPACE/log.txt
+
+        if [[ $? == 0 ]]; then
+          echo "Successfully uploaded ConcertDef Application Blueprint SBOM to Concert"
+        else
+          echo "Failed to upload ConcertDef Application Blueprint SBOM to Concert"
           cat $WORKSPACE/log.txt
         fi
