@@ -15,9 +15,9 @@ spec:
       type: string
     - name: source-url
       type: string
-    - name: source-commit
+    - name: source-commit-path
       type: string
-    - name: source-commit-timestamp
+    - name: source-commit-timestamp-path
       type: string
     - name: image
       type: string
@@ -26,8 +26,6 @@ spec:
     - name: concert-enabled
       type: string
       default: "false"
-    - name: concert-component-name
-      type: string
     - name: concert-component-version
       type: string
       default: "1.0.0"
@@ -43,16 +41,14 @@ spec:
       env:
         - name: CONCERT_ENABLED
           value: $(params.concert-enabled)
-        - name: CONCERT_COMPONENT_NAME
-          value: $(params.concert-component-name)
         - name: EVENT_TYPE
           value: $(params.event-type)
         - name: SOURCE_URL
           value: $(params.source-url)
-        - name: SOURCE_COMMIT
-          type: $(params.source-commit)
-        - name: SOURCE_COMMIT_TIMESTAMP
-          type: $(params.source-commit-timestamp)
+        - name: SOURCE_COMMIT_PATH
+          type: $(params.source-commit-path)
+        - name: SOURCE_COMMIT_TIMESTAMP_PATH
+          type: $(params.source-commit-timestamp-path)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
@@ -75,8 +71,8 @@ spec:
         fi
 
         echo "Source repo URL: $SOURCE_URL"
-        echo "Source repo commit: $SOURCE_COMMIT"
-        echo "Source repo commit timestamp: $SOURCE_COMMIT_TIMESTAMP"
+        echo "Source repo commit: $(cat $SOURCE_COMMIT_PATH)"
+        echo "Source repo commit timestamp: $(cat $SOURCE_COMMIT_TIMESTAMP_PATH)"
         echo "Generated image path+tag: $IMAGE_URL"
         echo "Generated image digest: $IMAGE_DIGEST"
 
@@ -94,6 +90,9 @@ spec:
         ls -la $WORKSPACE/source
         echo "------"
 
+        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
+        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
+
         mkdir -p $WORKSPACE/concert
         CONCERT_HOME=$WORKSPACE/concert
         SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
@@ -110,14 +109,17 @@ spec:
       image: registry.redhat.io/rhtas/cosign-rhel9:e28487714294d5c205e95da843e86fd28e4d3355d6a4d328a872c62ed0cf5f93@sha256:6fa39582a3d62a2aa5404397bb638fdd0960f9392db659d033d7bacf70bddfb1
       onError: continue
       env:
-        - name: CONCERT_COMPONENT_NAME
-          value: $(params.concert-component-name)
+        - name: SOURCE_URL
+          value: $(params.source-url)
         - name: IMAGE_URL
           value: $(params.image)
         - name: WORKSPACE
           value: $(workspaces.workspace.path)
       script: |
         #!/bin/bash
+
+        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
+        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
 
         CONCERT_HOME=$WORKSPACE/concert
         SBOM_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-sbom.json
@@ -147,16 +149,14 @@ spec:
     - name: upload-concertdef-build
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
-        - name: CONCERT_COMPONENT_NAME
-          value: $(params.concert-component-name)
         - name: CONCERT_COMPONENT_VERSION
           value: $(params.concert-component-version)
         - name: SOURCE_URL
           value: $(params.source-url)
-        - name: SOURCE_COMMIT
-          type: $(params.source-commit)
-        - name: SOURCE_COMMIT_TIMESTAMP
-          type: $(params.source-commit-timestamp)
+        - name: SOURCE_COMMIT_PATH
+          type: $(params.source-commit-path)
+        - name: SOURCE_COMMIT_TIMESTAMP_PATH
+          type: $(params.source-commit-timestamp-path)
         - name: IMAGE_URL
           value: $(params.image)
         - name: IMAGE_DIGEST
@@ -167,6 +167,9 @@ spec:
           value: $(workspaces.workspace.path)
       script: |
         #!/usr/bin/env bash
+
+        CONCERT_COMPONENT_NAME=$(basename $SOURCE_URL)
+        echo "CONCERT_COMPONENT_NAME: ${CONCERT_COMPONENT_NAME}"
 
         CONCERT_HOME=$WORKSPACE/concert
         echo "ls -la $WORKSPACE/concert"
@@ -183,4 +186,4 @@ spec:
 
         echo "Concert component name: $CONCERT_COMPONENT_NAME"
         echo "Concert component version: $CONCERT_COMPONENT_VERSION"
-        echo "Concert component build-number: $SOURCE_COMMIT_TIMESTAMP"
+        echo "Concert component build-number: $(cat $SOURCE_COMMIT_TIMESTAMP_PATH)"

@@ -225,18 +225,16 @@ spec:
           value: $(params.event-type)
         - name: source-url
           value: $(tasks.clone-repository.results.url)
-        - name: source-commit
-          value: $(cat $(tasks.clone-repository.results.commit.path))
-        - name: source-commit-timestamp
-          value: $(cat $(tasks.clone-repository.results.commit-timestamp.path))
+        - name: source-commit-path
+          value: $(tasks.clone-repository.results.commit.path)
+        - name: source-commit-timestamp-path
+          value: $(tasks.clone-repository.results.commit-timestamp.path)
         - name: image
           value: $(tasks.build-container.results.IMAGE_URL)
         - name: image-digest
           value: $(tasks.build-container.results.IMAGE_DIGEST)
         - name: concert-enabled
           value: $(params.concert-enabled)
-        - name: concert-component-name
-          value: $(params.concert-component-name)
         - name: concert-component-version
           value: $(params.concert-component-version)
       runAfter:
