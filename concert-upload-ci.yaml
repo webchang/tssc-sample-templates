@@ -87,7 +87,7 @@ spec:
           exit 1
         fi
 
-        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/docker-push.yaml
         if [ ! -s ${PUSH_PIPELINERUN} ]; then
           echo "PipelineRun file is empty or unavailable: ${PUSH_PIPELINERUN}"
           exit 1
@@ -113,7 +113,7 @@ spec:
       script: |
         #!/bin/bash
 
-        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/docker-push.yaml
         CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         CONCERT_HOME=$WORKSPACE/concert
@@ -191,7 +191,7 @@ spec:
 
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        PUSH_PIPELINERUN=$WORKSPACE/source.tekton/docker-push.yaml
+        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/docker-push.yaml
         CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         ###
