@@ -65,4 +65,3 @@ spec:
     - name: git-auth
       optional: true
     - name: concert-api
-      optional: true
