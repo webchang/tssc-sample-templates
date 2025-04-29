@@ -213,12 +213,12 @@ spec:
         # Initialize build inventory SBOM with a container object
         #
         tempfile=$(mktemp)
-        jq --arg timestamp ${TIMESTAMP} \
+        jq -n --arg timestamp ${TIMESTAMP} \
           --arg component_name ${CONCERT_COMPONENT_NAME} \
           --arg component_version ${CONCERT_COMPONENT_VERSION} \
           --arg build_number ${TIMESTAMP} \
           --arg container_name "${IMAGE_URL}@${IMAGE_DIGEST}" \
-          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "build", "component": {"name": $component_name, "version": $component_version, "build-number": $build_number}}, "components": [{"type": "container", "name": $container_name}]}' > $tempfile
+          '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "build", "component": {"name": $component_name, "version": $component_version, "build-number": $build_number}}, "components": [{"type": "container", "name": $container_name}]}' > $tempfile
         cp ${tempfile} ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
@@ -277,12 +277,12 @@ spec:
         APP_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-app.json
 
         tempfile=$(mktemp)
-        jq --arg timestamp ${TIMESTAMP} \
+        jq -n --arg timestamp ${TIMESTAMP} \
           --arg app_name ${CONCERT_APP_NAME} \
           --arg app_version ${CONCERT_COMPONENT_VERSION} \
           --arg component_name ${CONCERT_COMPONENT_NAME} \
           --arg component_version ${CONCERT_COMPONENT_VERSION} \
-          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "application", "component": {"name": $app_name, "version": $app_version}, "business": {"name": $component_name, "units": [{"name": $component_name}]}}, "components": [{"type": "build", "name": $component_name, "version": $component_version}]}' \
+          '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "application", "component": {"name": $app_name, "version": $app_version}, "business": {"name": $component_name, "units": [{"name": $component_name}]}}, "components": [{"type": "build", "name": $component_name, "version": $component_version}]}' \
           > $tempfile
         cp ${tempfile} ${APP_SBOM}
 
