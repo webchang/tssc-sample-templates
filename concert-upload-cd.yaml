@@ -190,37 +190,37 @@ spec:
           cat $WORKSPACE/log.txt
         fi
 
-        ENVIRONMENTS=["development", "stage", "prod"]
+        # ENVIRONMENTS=["development", "stage", "prod"]
 
-        IMAGE_PATH='.spec.template.spec.containers[0].image'
-        IMAGES_FILE='/tmp/all-images.txt'
-        component_name=$(yq .metadata.name application.yaml)
+        # IMAGE_PATH='.spec.template.spec.containers[0].image'
+        # IMAGES_FILE='/tmp/all-images.txt'
+        # component_name=$(yq .metadata.name application.yaml)
 
-        for env in "$ENVIRONMENTS"; do
-          yaml_path=components/${component_name}/overlays/${env}/deployment-patch.yaml
-          image=$(yq "$IMAGE_PATH" "$yaml_path")
+        # for env in "$ENVIRONMENTS"; do
+        #   yaml_path=components/${component_name}/overlays/${env}/deployment-patch.yaml
+        #   image=$(yq "$IMAGE_PATH" "$yaml_path")
 
-          printf "%s\n" "$yaml_path"
-          printf "%s\n" "$image"
-        done
+        #   printf "%s\n" "$yaml_path"
+        #   printf "%s\n" "$image"
+        # done
 
-        # if [ ! -s $IMAGES_FILE ]; then
-        #   echo "No images to verify"
-        #   touch $(results.IMAGES_TO_VERIFY.path)
-        #   exit 0
-        # fi
+        # # if [ ! -s $IMAGES_FILE ]; then
+        # #   echo "No images to verify"
+        # #   touch $(results.IMAGES_TO_VERIFY.path)
+        # #   exit 0
+        # # fi
 
-        # printf "contents of %s:\n" "$IMAGES_FILE"
-        # cat $IMAGES_FILE
-        # echo "------"
+        # # printf "contents of %s:\n" "$IMAGES_FILE"
+        # # cat $IMAGES_FILE
+        # # echo "------"
 
-        # jq --compact-output --raw-input --slurp < $IMAGES_FILE '
-        #   # split input file
-        #   split("\n") |
-        #   # drop empty lines
-        #   map(select(length > 0)) |
-        #   # convert into EC-compatible format
-        #   {
-        #     "components": map({"containerImage": .})
-        #   }
-        # '
+        # # jq --compact-output --raw-input --slurp < $IMAGES_FILE '
+        # #   # split input file
+        # #   split("\n") |
+        # #   # drop empty lines
+        # #   map(select(length > 0)) |
+        # #   # convert into EC-compatible format
+        # #   {
+        # #     "components": map({"containerImage": .})
+        # #   }
+        # # '
