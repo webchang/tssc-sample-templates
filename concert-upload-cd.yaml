@@ -197,7 +197,7 @@ spec:
         IMAGES_FILE='/tmp/all-images.txt'
         component_name=$(yq .metadata.name application.yaml)
 
-        for env in "$@"; do
+        for env in "$ENVIRONMENTS"; do
           yaml_path=components/${component_name}/overlays/${env}/deployment-patch.yaml
           image=$(yq "$IMAGE_PATH" "$yaml_path")
 
@@ -225,7 +225,7 @@ spec:
         printf "contents of %s:\n" "$IMAGES_FILE"
         cat $IMAGES_FILE
         echo "------"
-        
+
         jq --compact-output --raw-input --slurp < $IMAGES_FILE '
           # split input file
           split("\n") |
