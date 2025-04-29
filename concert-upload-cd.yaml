@@ -132,7 +132,7 @@ spec:
         RUNTIME_COMPONENT_NAME=${K8ID}-${ENV_TYPE}
 
         # [application.yaml] .spec.destination.server
-        API_SERVER=$(grep "server" ${APP_YAML} | cut -d ':' -f 2 | sed 's/^ *//')
+        API_SERVER=$(grep "server" ${APP_YAML} | sed 's/^ *server: //')
 
         CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
 
@@ -141,7 +141,8 @@ spec:
         # [application.yaml] .spec.destination.namespace
         K8NS=$(grep "kubernetes-namespace" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
-        DEPLOY_NS=${K8ID}-${ENV_TYPE}
+        K8NS=$(grep "kubernetes-namespace" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+        DEPLOY_NS=${K8NS}-${ENV_TYPE}
 
         IMAGE_NAME="TBD"
 
