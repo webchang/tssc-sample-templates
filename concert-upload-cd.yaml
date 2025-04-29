@@ -149,7 +149,7 @@ spec:
         #
         tempfile=$(mktemp)
         jq --arg timestamp ${TIMESTAMP} \
-          --arg environment ${RUNTIME_ENV} \
+          --arg environment ${ENV_TYPE} \
           --arg component_name ${CONCERT_COMPONENT_NAME} \
           --arg component_version ${CONCERT_COMPONENT_VERSION} \
           --arg deploy_number ${TIMESTAMP} \
