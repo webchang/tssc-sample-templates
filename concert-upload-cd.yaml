@@ -167,9 +167,9 @@ spec:
         jq . ${DEPLOY_SBOM}
 
         ###
-        # Upload ConcertDef Build Inventory SBOM
+        # Upload ConcertDef DEPLOY Inventory SBOM
         #
-        echo "Contents of ConcertDef Build Inventory SBOM: ${DEPLOY_SBOM}"
+        echo "Contents of ConcertDef Deploy Inventory SBOM: ${DEPLOY_SBOM}"
 
         UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
         AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
@@ -184,13 +184,12 @@ spec:
           2>&1 > $WORKSPACE/log.txt
 
         if [[ $? == 0 ]]; then
-          echo "Successfully uploaded ConcertDef Build Inventory SBOM to Concert"
+          echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
         else
-          echo "Failed to upload ConcertDef Build Inventory SBOM to Concert"
+          echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
           cat $WORKSPACE/log.txt
         fi
 
-        TARGET_BRANCH=main
         ENVIRONMENTS=["development", "stage", "prod"]
 
         IMAGE_PATH='.spec.template.spec.containers[0].image'
@@ -201,41 +200,19 @@ spec:
           yaml_path=components/${component_name}/overlays/${env}/deployment-patch.yaml
           image=$(yq "$IMAGE_PATH" "$yaml_path")
 
-          # if [ -n "$TARGET_BRANCH" ]; then
-          #   prev_image=$(git show "origin/$TARGET_BRANCH:$yaml_path" | yq "$IMAGE_PATH")
-          #   if [ "$prev_image" = "$image" ]; then
-          #     # don't check images that didn't change between the current revision and the target branch
-          #     continue
-          #   fi
-          # fi
-
           printf "%s\n" "$yaml_path"
           printf "%s\n" "$image"
-        done | sort -u > $IMAGES_FILE
+        done
 
-        if [ ! -s $IMAGES_FILE ]; then
-          echo "No images to verify"
-          touch $(results.IMAGES_TO_VERIFY.path)
-          exit 0
-        fi
+        # if [ ! -s $IMAGES_FILE ]; then
+        #   echo "No images to verify"
+        #   touch $(results.IMAGES_TO_VERIFY.path)
+        #   exit 0
+        # fi
 
-        # TODO: each component needs a {"source": {"git": {"url": "...", "revision": "..."}}}
-        #       will that be too large for Tekton results?
-
-        printf "contents of %s:\n" "$IMAGES_FILE"
-        cat $IMAGES_FILE
-        echo "------"
-
-        jq --compact-output --raw-input --slurp < $IMAGES_FILE '
-          # split input file
-          split("\n") |
-          # drop empty lines
-          map(select(length > 0)) |
-          # convert into EC-compatible format
-          {
-            "components": map({"containerImage": .})
-          }
-        '
+        # printf "contents of %s:\n" "$IMAGES_FILE"
+        # cat $IMAGES_FILE
+        # echo "------"
 
         # jq --compact-output --raw-input --slurp < $IMAGES_FILE '
         #   # split input file
@@ -246,4 +223,4 @@ spec:
         #   {
         #     "components": map({"containerImage": .})
         #   }
-        # ' | tee $(results.IMAGES_TO_VERIFY.path)
+        # '
