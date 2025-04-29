@@ -160,7 +160,7 @@ spec:
           --arg api_server ${API_SERVER} \
           --arg deploy_ns ${DEPLOY_NS} \
           --arg image_name ${IMAGE_NAME} \
-          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "deploy", "environment": $environment, "component": {"name": $component_name, "version": $component_version, "deploy-number": $deploy_number}}, "components": [{"type": "code", "name": $code_name, "purl": $code_purl}], "runtime-components": [ {"type": "kubernetes", "name": $runtime_component_name, "api-server": $api_server, "components": [{"type": "namespace", "name": $deploy_ns, "components": [{"type": "container", "name": $image_name. "uri": $image_name}]}]}]}' \
+          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "deploy", "environment": $environment, "component": {"name": $component_name, "version": $component_version, "deploy-number": $deploy_number}}, "components": [{"type": "code", "name": $code_name, "purl": $code_purl}], "runtime-components": [ {"type": "kubernetes", "name": $runtime_component_name, "api-server": $api_server, "components": [{"type": "namespace", "name": $deploy_ns, "components": [{"type": "container", "name": $image_name, "uri": $image_name}]}]}]}' \
           > $tempfile
         cp ${tempfile} ${DEPLOY_SBOM}
         jq . ${DEPLOY_SBOM}
