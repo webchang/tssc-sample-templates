@@ -1,0 +1,68 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: gitops-push
+spec:
+  params:
+    - description: Gitops repo url
+      name: git-url
+      type: string
+    - default: ""
+      description: Gitops repo revision
+      name: revision
+      type: string
+    - default: main
+      description: The target branch for the push
+      name: target-branch
+      type: string
+  tasks:
+    - name: clone-repository
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.revision)
+        - name: fetchTags
+          value: "true"
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: workspace
+        - name: basic-auth
+          workspace: git-auth
+    - name: concert-upload-cd
+      onError: continue
+      params:
+        - name: event-type
+          value: $(params.event-type)
+        - name: source-url
+          value: $(tasks.clone-repository.results.url)
+        - name: source-commit
+          value: $(tasks.clone-repository.results.commit)
+        - name: source-commit-timestamp
+          value: $(tasks.clone-repository.results.commit-timestamp)
+        - name: concert-enabled
+          value: $(params.concert-enabled)
+      runAfter:
+        - clone-repository
+      taskRef:
+        kind: Task
+        name: concert-upload-cd
+      when:
+        - input: $(params.event-type)
+          operator: notin
+          values:
+            - pull_request
+            - Merge Request
+      workspaces:
+        - name: concert-api
+          workspace: concert-api
+        - name: workspace
+          workspace: workspace
+  workspaces:
+    - name: workspace
+    - name: git-auth
+      optional: true
+    - name: concert-api
+      optional: true

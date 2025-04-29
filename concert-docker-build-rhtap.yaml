@@ -255,3 +255,5 @@ spec:
     - name: workspace
     - name: git-auth
       optional: true
+    - name: concert-api
+      optional: true
