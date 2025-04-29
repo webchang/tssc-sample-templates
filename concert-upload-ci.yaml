@@ -217,7 +217,7 @@ spec:
           --arg component_name ${CONCERT_COMPONENT_NAME} \
           --arg component_version ${CONCERT_COMPONENT_VERSION} \
           --arg build_number ${TIMESTAMP} \
-          --arg container_name "${IMAGE_URL}@${IMAGE_DIGEST}" \
+          --arg container_name ${IMAGE_URL}@${IMAGE_DIGEST} \
           '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "build", "component": {"name": $component_name, "version": $component_version, "build-number": $build_number}}, "components": [{"type": "container", "name": $container_name}]}' > $tempfile
         cp ${tempfile} ${BUILD_SBOM}
 
