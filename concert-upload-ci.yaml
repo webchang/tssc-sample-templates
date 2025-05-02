@@ -39,19 +39,6 @@ spec:
       description: The workspace where source code is included.
       optional: true
   steps:
-    - name: printenv-oc
-      image: registry.redhat.io/openshift4/ose-client:latest
-      onError: continue
-      script: |
-        #!/usr/bin/env bash
-        set -x
-
-        printenv
-
-        oc config
-        oc config get-contexts
-        oc get routes
-
     - name: concert-enablement-validation
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
@@ -220,6 +207,9 @@ spec:
       script: |
         #!/usr/bin/env bash
 
+        sudo snap install yq
+        which yq
+
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -232,7 +222,10 @@ spec:
         ###
 
         PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/docker-push.yaml
-        COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+        COMPONENT_NAME=$(grep "backstage.io/kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+
+        echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
+        yq '.metadata.labels.backstage.io/kubernetes-id' ${PUSH_PIPELINERUN}
 
         ###
         # Generate ConcertDef Build Inventory SBOM
