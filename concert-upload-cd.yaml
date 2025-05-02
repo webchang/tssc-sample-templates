@@ -32,6 +32,19 @@ spec:
       description: The workspace where source code is included.
       optional: true
   steps:
+    - name: printenv-oc
+      image: registry.redhat.io/openshift4/ose-client:latest
+      onError: continue
+      script: |
+        #!/usr/bin/env bash
+        set -x
+
+        printenv
+
+        oc config
+        oc config get-contexts
+        oc get routes
+
     - name: concert-enablement-validation
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:

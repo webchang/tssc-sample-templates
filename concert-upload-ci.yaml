@@ -41,6 +41,7 @@ spec:
   steps:
     - name: printenv-oc
       image: registry.redhat.io/openshift4/ose-client:latest
+      onError: continue
       script: |
         #!/usr/bin/env bash
         set -x
