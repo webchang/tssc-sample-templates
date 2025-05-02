@@ -130,13 +130,13 @@ spec:
         COMPONENT_NAME=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
-        yq '.metadata.annotations."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN}
+        yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN}
 
         ###
         # Discover the updated images
         #
         IMAGE_PATHS=$(mktemp)
-        git diff --no-index --name-only HEAD* | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
+        git diff --no-index --name-only HEAD^ | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
         echo "changed images:"
         cat ${IMAGE_PATHS}
         echo "------"
@@ -148,32 +148,31 @@ spec:
 
         # environment type as defined by dir names 
         #
-        ENV_TYPE="rhtap-app-development" # destination.namespace in application-ENV.yaml
+        ENV_TYPE="development"
+        APP_INSTANCE_FILE="application-dev.yaml"
+        APP_INSTANCE_ENV="py3svc-development" # .metadata.name in $APP_INSTANCE_FILE
 
         # K8 ID: backstage.io/kubernetes-id: py3svc
         #
         K8ID=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         APP_YAML=$WORKSPACE/source/app-of-apps/application-dev.yaml
-        RUNTIME_COMPONENT_NAME=${K8ID}-${ENV_TYPE}
-
-        API_SERVER=$(grep "server" ${APP_YAML} | sed 's/^ *server: //')
+        RUNTIME_COMPONENT_NAME=${K8ID}-${APP_INSTANCE_ENV}
 
         CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
-
-        # K8 namespace: backstage.io/kubernetes-namespace: rhtap-app
-        # or
-        # [application.yaml] .spec.destination.namespace
-        K8NS=$(grep "kubernetes-namespace" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
-        DEPLOY_NS=${K8NS}-${ENV_TYPE}
 
         IMAGE_NAME="quay.io/org4rong/py3img"
         IMAGE_URI="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d@sha256:3c1fbab8a4fe195270c6bc71a92a0b8a1a35108933d9080b19dcc8e7771ed088"
 
+        APP_DEF_FILE="app-of-apps/application-dev.yaml"
+        RHDH_K8_ID=$(cut -d ':' -F 0 $(yq '.metadata.name' ${APP_DEF_FILE}))
+        RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_FILE})
+        RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_FILE})
+
         # Initialize deploy inventory SBOM with a container object
         #
         jq --arg timestamp ${TIMESTAMP} \
-          --arg environment ${ENV_TYPE} \
+          --arg app_env ${APP_INSTANCE_ENV} \
           --arg component_name ${COMPONENT_NAME} \
           --arg component_version ${COMPONENT_VERSION} \
           --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
@@ -181,9 +180,9 @@ spec:
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit ${SOURCE_COMMIT} \
           --arg runtime_component_name ${RUNTIME_COMPONENT_NAME} \
-          --arg api_server ${API_SERVER} \
-          --arg cluster_name ${COMPONENT_NAME} \
-          --arg deploy_ns ${DEPLOY_NS} \
+          --arg api_server ${RHDH_K8_SERVER} \
+          --arg cluster_id ${RHDH_K8_ID} \
+          --arg k8ns ${RHDH_K8_NS} \
           --arg image_name ${IMAGE_NAME} \
           --arg image_uri ${IMAGE_URI} '
             { "bomFormat": "ConcertDef",
@@ -191,7 +190,7 @@ spec:
                "metadata": {
                 "timestamp": $timestamp,
                 "type": "deploy",
-                "environment": "$environment",
+                "environment": $app_env,
                 "component": {
                   "name": $component_name,
                   "version": $component_version,
@@ -207,17 +206,17 @@ spec:
               ],
               "runtime-components": [
                 { "type": "kubernetes",
-                  "name": "py3svc-development", # .metadata.name in application-ENV.yaml
+                  "name": $app_env,
                   "api-server": $api_server,
                   "properties": [
                     {
-                      "name": "cluster_name",
-                      "value": "in-cluster"
+                      "name": "cluster_id",
+                      "value": $cluster_id
                     }
                   ],
                   "components": [
                     { "type": "namespace",
-                      "name": "rhtap-app-development", # same of environment
+                      "name": $k8ns,
                       "components": [
                         { "type": "container",
                           "name": $image_name,
