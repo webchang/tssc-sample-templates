@@ -114,8 +114,10 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        sudo snap install yq
-        which yq
+        if ! command -v yq 2>&1 /dev/null; then
+          echo "install yq"
+          snap install yq
+        fi
 
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -134,7 +136,7 @@ spec:
         # Discover the updated images
         #
         IMAGE_PATHS=$(mktemp)
-        git diff --name-only HEAD* | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
+        git diff --no-index --name-only HEAD* | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
         echo "changed images:"
         cat ${IMAGE_PATHS}
         echo "------"
@@ -227,7 +229,7 @@ spec:
                 }
               ]
             }
-          ' -n > ${DEPLOY_SBOM}
+        ' -n > ${DEPLOY_SBOM}
 
         jq . ${DEPLOY_SBOM}
 

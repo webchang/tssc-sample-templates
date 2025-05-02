@@ -121,7 +121,10 @@ spec:
       script: |
         #!/bin/bash
 
-        tempfile=$(mktemp)
+        if ! command -v jq 2>&1 /dev/null; then
+          echo "install jq"
+          snap install jq
+        fi
 
         IMAGE_PATH=$(echo ${IMAGE_URL} | cut -d ':' -f 1)
         CYCLONEDX_SBOM=$WORKSPACE/concert/$(basename ${IMAGE_PATH})-sbom.json
@@ -207,8 +210,10 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        sudo snap install yq
-        which yq
+        if ! command -v yq 2>&1 /dev/null; then
+          echo "install yq"
+          snap install yq
+        fi
 
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -259,7 +264,7 @@ spec:
                 }
               ]
             }
-          ' > ${BUILD_SBOM}
+        ' > ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
         #
@@ -292,7 +297,7 @@ spec:
                 "commit_sha": $code_commit_sha
               }
             ]
-          ' > $tempfile
+        ' > $tempfile
         cp $tempfile ${BUILD_SBOM}
         jq . ${BUILD_SBOM}
 
@@ -363,7 +368,7 @@ spec:
                 }
               ]
             }
-          ' > $tempfile
+        ' > $tempfile
         cp $tempfile ${APP_SBOM}
         jq . ${APP_SBOM}
 
