@@ -19,9 +19,12 @@ spec:
       type: string
     - name: source-commit-timestamp
       type: string
-    - name: concert-enabled
+    - name: if-concert-enabled
       type: string
       default: "false"
+    - name: concert-component-version
+      type: string
+      default: "1.0.0"
     - name: concert-component-version
       type: string
       default: "1.0.0"
@@ -43,8 +46,8 @@ spec:
           value: $(params.source-commit)
         - name: SOURCE_COMMIT_TIMESTAMP
           value: $(params.source-commit-timestamp)
-        - name: CONCERT_ENABLED
-          value: $(params.concert-enabled)
+        - name: IF_CONCERT_ENABLED
+          value: $(params.if-concert-enabled)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -52,29 +55,18 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        if [[ ${CONCERT_ENABLED} != "true" ]]; then
-          echo "Concert is not enabled"
-          exit 1
+        echo "Defined Environment Varaibles"
+        printenv
+        echo "------"
+        
+        if [[ ${IF_CONCERT_ENABLED} == "false" ]]; then
+          echo "Skip concert-upload-ci since Concert was not enabled."
+          exit 0
         fi
 
         if [[ ${EVENT_TYPE} != "push" ]]; then
-          echo "Concert task was not trigger by a push event"
-          exit 1
-        fi
-
-        TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "Source repo URL: $SOURCE_URL"
-        echo "Source repo commit: $SOURCE_COMMIT"
-        echo "Source repo commit timestamp: $TIMESTAMP"
-
-        curl -sS -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $WORKSPACE/log.txt
-
-        if [[ $? == 0 ]]; then
-          echo "Target Concert service is reachable"
-        else
-          echo "Target Concert service is not reachable"
-          cat $WORKSPACE/log.txt
-          exit 1
+          echo "Skip concert-upload-ci since this pipelinerun was not triggered by a push event."
+          exit 0
         fi
 
         PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
@@ -83,12 +75,29 @@ spec:
           exit 1
         fi
 
-        CONCERT_COMPONENT_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
-        echo "Concert component and app name: ${CONCERT_COMPONENT_NAME}"
+        tempfile=$(mktemp)
 
+        TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "Source repo URL: $SOURCE_URL"
+        echo "Source repo commit: $SOURCE_COMMIT"
+        echo "Source repo commit timestamp: $TIMESTAMP"
+
+        # Create the local home directory for Concert
+        #
         mkdir -p $WORKSPACE/concert
-        CONCERT_HOME=$WORKSPACE/concert
-        echo "Concert home directory: $CONCERT_HOME"
+
+        ###
+        # Check reachability to the target Concert service
+        #
+        curl -sS -H "Authorization: $(cat ${WORKSPACE_CONCERT_API}/key-type) $(cat ${WORKSPACE_CONCERT_API}/key-value)" -H "InstanceId: $(cat ${WORKSPACE_CONCERT_API}/instance-id)"  $(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/core/api/v1/applications 2>&1 > $tempfile
+
+        if [[ $? == 0 ]]; then
+          echo "Target Concert service is reachable"
+        else
+          echo "Target Concert service is not reachable"
+          cat $tempfile
+          exit 1
+        fi
 
     - name: upload-concertdef-deploy-app
       image: quay.io/konflux-ci/appstudio-utils:48c311af02858e2422d6229600e9959e496ddef1@sha256:91ddd999271f65d8ec8487b10f3dd378f81aa894e11b9af4d10639fd52bba7e8
@@ -99,7 +108,7 @@ spec:
           value: $(params.source-commit)
         - name: SOURCE_COMMIT_TIMESTAMP
           value: $(params.source-commit-timestamp)
-        - name: CONCERT_COMPONENT_VERSION
+        - name: COMPONENT_VERSION
           value: $(params.concert-component-version)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
@@ -108,18 +117,30 @@ spec:
       script: |
         #!/usr/bin/env bash
 
+        tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
-        APP_YAML=$WORKSPACE/source/application.yaml
+        echo "Defined Environment Varaibles"
+        printenv
+        echo "------"
 
-        CONCERT_COMPONENT_NAME=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
+        COMPONENT_NAME=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+
+        ###
+        # Discover the updated images
+        #
+        IMAGE_PATHS=$(mktemp)
+        git diff --name-only HEAD* | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
+        echo "changed images:"
+        cat ${IMAGE_PATHS}
+        echo "------"
 
         ###
         # Generate ConcertDef Deploy Inventory SBOM
         #
-        CONCERT_HOME=$WORKSPACE/concert
-        DEPLOY_SBOM=${CONCERT_HOME}/${CONCERT_COMPONENT_NAME}-deploy.json
+        DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
+        APP_YAML=$WORKSPACE/source/application.yaml
 
         # environment type as defined by dir names 
         #
@@ -142,15 +163,15 @@ spec:
         K8NS=$(grep "kubernetes-namespace" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
         DEPLOY_NS=${K8NS}-${ENV_TYPE}
 
-        IMAGE_NAME="TBD"
+        IMAGE_NAME="quay.io/org4rong/py3img"
+        IMAGE_URI="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d@sha256:3c1fbab8a4fe195270c6bc71a92a0b8a1a35108933d9080b19dcc8e7771ed088"
 
         # Initialize deploy inventory SBOM with a container object
         #
-        tempfile=$(mktemp)
         jq --arg timestamp ${TIMESTAMP} \
           --arg environment ${ENV_TYPE} \
-          --arg component_name ${CONCERT_COMPONENT_NAME} \
-          --arg component_version ${CONCERT_COMPONENT_VERSION} \
+          --arg component_name ${COMPONENT_NAME} \
+          --arg component_version ${COMPONENT_VERSION} \
           --arg deploy_number ${TIMESTAMP} \
           --arg code_name ${CODE_COMPONENT_NAME} \
           --arg code_purl ${SOURCE_URL} \
@@ -159,31 +180,66 @@ spec:
           --arg api_server ${API_SERVER} \
           --arg deploy_ns ${DEPLOY_NS} \
           --arg image_name ${IMAGE_NAME} \
-          -n '{"bomFormat": "ConcertDef", "specVersion": "1.0.2", "metadata": {"timestamp": $timestamp, "type": "deploy", "environment": $environment, "component": {"name": $component_name, "version": $component_version, "deploy-number": $deploy_number}}, "components": [{"type": "code", "name": $code_name, "purl": $code_purl}], "runtime-components": [ {"type": "kubernetes", "name": $runtime_component_name, "api-server": $api_server, "components": [{"type": "namespace", "name": $deploy_ns, "components": [{"type": "container", "name": $image_name, "uri": $image_name}]}]}]}' \
-          > $tempfile
-        cp ${tempfile} ${DEPLOY_SBOM}
+          --arg image_uri ${IMAGE_URI} '
+            { "bomFormat": "ConcertDef",
+              "specVersion": "1.0.2",
+               "metadata": {
+                "timestamp": $timestamp,
+                "type": "deploy",
+                "environment": $environment,
+                "component": {
+                  "name": $component_name,
+                  "version": $component_version,
+                  "deploy-number": $deploy_number
+                }
+              },
+              "components": [
+                { "type": "code",
+                  "name": $code_name,
+                  "purl": $code_purl,
+                  "commit_sha", $code_commit
+                }
+              ],
+              "runtime-components": [
+                { "type": "kubernetes",
+                  "name": $runtime_component_name,
+                  "api-server": $api_server,
+                  "components": [
+                    { "type": "namespace",
+                      "name": $deploy_ns,
+                      "components": [
+                        { "type": "container",
+                          "name": $image_name,
+                          "uri": $image_name
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ' -n > ${DEPLOY_SBOM}
 
-        echo "Contents of ConcertDef Deploy Inventory SBOM: ${DEPLOY_SBOM}"
         jq . ${DEPLOY_SBOM}
 
-        ###
-        # Upload ConcertDef DEPLOY Inventory SBOM
-        #
-        UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
-        AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
-        AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
-        curl -X POST -sS "${UPLOAD_URL}" \
-          -H 'accept: application/json' \
-          -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
-          -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
-          -H 'Content-Type: multipart/form-data' \
-          -F "data_type=application_sbom" \
-          -F "filename=@${DEPLOY_SBOM}" \
-          2>&1 > $WORKSPACE/log.txt
+        # ###
+        # # Upload ConcertDef DEPLOY Inventory SBOM
+        # #
+        # UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+        # AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+        # AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+        # curl -X POST -sS "${UPLOAD_URL}" \
+        #   -H 'accept: application/json' \
+        #   -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+        #   -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
+        #   -H 'Content-Type: multipart/form-data' \
+        #   -F "data_type=application_sbom" \
+        #   -F "filename=@${DEPLOY_SBOM}" \
+        #   2>&1 > $WORKSPACE/log.txt
 
-        if [[ $? == 0 ]]; then
-          echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
-        else
-          echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
-          cat $WORKSPACE/log.txt
-        fi
+        # if [[ $? == 0 ]]; then
+        #   echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
+        # else
+        #   echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
+        #   cat $WORKSPACE/log.txt
+        # fi
