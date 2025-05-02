@@ -128,7 +128,7 @@ spec:
         COMPONENT_NAME=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
-        yq '.metadata.annotations.backstage.io/kubernetes-id' ${PUSH_PIPELINERUN}
+        yq '.metadata.annotations."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN}
 
         ###
         # Discover the updated images

@@ -225,7 +225,7 @@ spec:
         COMPONENT_NAME=$(grep "backstage.io/kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
         echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
-        yq '.metadata.labels.backstage.io/kubernetes-id' ${PUSH_PIPELINERUN}
+        yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN}
 
         ###
         # Generate ConcertDef Build Inventory SBOM
