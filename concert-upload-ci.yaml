@@ -39,6 +39,18 @@ spec:
       description: The workspace where source code is included.
       optional: true
   steps:
+    - name: printenv-oc
+      image: registry.redhat.io/openshift4/ose-client:latest
+      script: |
+        #!/usr/bin/env bash
+        set -x
+
+        printenv
+
+        oc config
+        oc config get-contexts
+        oc get routes
+
     - name: concert-enablement-validation
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
@@ -154,8 +166,10 @@ spec:
 
         # Replace SBOM component name with image path+tag
         #
-        jq --arg img_url ${IMG_URL} '.metadata.component.name = $img_url' \
-          ${CYCLONEDX_SBOM} > $tempfile
+        jq ${CYCLONEDX_SBOM} \
+          --arg img_url ${IMG_URL} '
+            .metadata.component.name = $img_url
+          ' > $tempfile
         cp $tempfile ${CYCLONEDX_SBOM}
 
         ###
@@ -226,7 +240,8 @@ spec:
 
         # Initialize build inventory SBOM with a container object
         #
-        jq --arg timestamp ${TIMESTAMP} \
+        jq -n \
+          --arg timestamp ${TIMESTAMP} \
           --arg component_name ${COMPONENT_NAME} \
           --arg component_version ${COMPONENT_VERSION} \
           --arg build_number ${SOURCE_COMMIT_TIMESTAMP} \
@@ -250,7 +265,7 @@ spec:
                 }
               ]
             }
-          ' -n > ${BUILD_SBOM}
+          ' > ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
         #
@@ -262,16 +277,18 @@ spec:
           export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$sbom_ver"
           echo "BOM-LINK of SBOM: ${SBOM_LINK}"
 
-          jq --arg sbom_link ${SBOM_LINK} \
-            '.components[0] += {"cyclonedx-bom-link": $sbom_link}' \
-            ${BUILD_SBOM} > $tempfile
+          jq ${BUILD_SBOM} \
+            --arg sbom_link ${SBOM_LINK} '
+              .components[0] += {"cyclonedx-bom-link": $sbom_link}
+            ' > $tempfile
           cp $tempfile ${BUILD_SBOM}
         fi
 
         # Add a code object to the build inventory SBOM
         #
         CODE_NAME=$(basename $SOURCE_URL)
-        jq --arg code_name ${CODE_NAME} \
+        jq ${BUILD_SBOM} \
+          --arg code_name ${CODE_NAME} \
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit_sha ${SOURCE_COMMIT} '
             .components += [
@@ -281,7 +298,7 @@ spec:
                 "commit_sha": $code_commit_sha
               }
             ]
-          ' ${BUILD_SBOM} > $tempfile
+          ' > $tempfile
         cp $tempfile ${BUILD_SBOM}
         jq . ${BUILD_SBOM}
 
@@ -322,7 +339,7 @@ spec:
         APP_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
         APP_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-app.json
 
-        jq -n
+        jq -n \
           --arg timestamp ${TIMESTAMP} \
           --arg app_name ${APP_NAME} \
           --arg app_version ${COMPONENT_VERSION} \
