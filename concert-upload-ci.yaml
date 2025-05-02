@@ -63,10 +63,6 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        echo "Defined Environment Varaibles"
-        printenv
-        echo "------"
-
         if [[ ${IF_CONCERT_ENABLED} == "false" ]]; then
           echo "Skip concert-upload-ci since Concert was not enabled."
           exit 0
@@ -174,17 +170,8 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        if ! command -v yq 2>&1 /dev/null; then
-          echo "install yq"
-          snap install yq
-        fi
-
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
-
-        echo "Defined Environment Varaibles"
-        printenv
-        echo "------"
 
         IMAGE_PATH=$(echo ${IMAGE_URL} | cut -d ':' -f 1)
         CYCLONEDX_SBOM=$WORKSPACE/concert/$(basename ${IMAGE_PATH})-sbom.json
@@ -194,7 +181,7 @@ spec:
           jq ${CYCLONEDX_SBOM} \
             --arg img_url ${IMG_URL} '
               .metadata.component.name = $img_url
-            ' > $tempfile
+          ' > $tempfile
           cp $tempfile ${CYCLONEDX_SBOM}
 
           ###
@@ -226,15 +213,13 @@ spec:
         ###
 
         PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/docker-push.yaml
-        COMPONENT_NAME=$(grep "backstage.io/kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
-
-        echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
-        yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN}
+        COMPONENT_NAME=$(yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN})
 
         ###
         # Generate ConcertDef Build Inventory SBOM
         #
         BUILD_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-build.json
+        CONTAINER_URI="${IMAGE_URL}@${IMAGE_DIGEST}"
 
         # Initialize build inventory SBOM with a container object
         #
@@ -244,7 +229,7 @@ spec:
           --arg component_version ${COMPONENT_VERSION} \
           --arg build_number ${SOURCE_COMMIT_TIMESTAMP} \
           --arg container_name ${IMAGE_URL} \
-          --arg container_uri ${IMAGE_URL}@${IMAGE_DIGEST} '
+          --arg container_uri ${CONTAINER_URI} '
             { "bomFormat": "ConcertDef",
               "specVersion": "1.0.2",
               "metadata": {

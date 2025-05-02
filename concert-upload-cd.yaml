@@ -133,10 +133,12 @@ spec:
         # Discover the updated images
         #
         IMAGE_PATHS=$(mktemp)
+        pushd $WORKSPACE/source
         git diff --name-only HEAD^ | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
         echo "changed images:"
         cat ${IMAGE_PATHS}
         echo "------"
+        popd
 
         # environment type as defined by dir names 
         #
@@ -155,7 +157,7 @@ spec:
         CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
 
         RHDH_APP_INSTANCE=$(yq '.metadata.name' ${APP_DEF_YAML})
-        RHDH_K8_ID=$(cut -d ':' -F 0 $(yq '.metadata.name' ${APP_DEF_YAML}))
+        RHDH_K8_ID=${COMPONENT_NAME}
         RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_YAML})
         RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_YAML})
 
