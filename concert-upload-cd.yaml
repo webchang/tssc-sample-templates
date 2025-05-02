@@ -32,19 +32,6 @@ spec:
       description: The workspace where source code is included.
       optional: true
   steps:
-    - name: printenv-oc
-      image: registry.redhat.io/openshift4/ose-client:latest
-      onError: continue
-      script: |
-        #!/usr/bin/env bash
-        set -x
-
-        printenv
-
-        oc config
-        oc config get-contexts
-        oc get routes
-
     - name: concert-enablement-validation
       image: registry.access.redhat.com/ubi8-minimal@sha256:7583ca0ea52001562bd81a961da3f75222209e6192e4e413ee226cff97dbd48c
       env:
@@ -127,6 +114,9 @@ spec:
       script: |
         #!/usr/bin/env bash
 
+        sudo snap install yq
+        which yq
+
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -136,6 +126,9 @@ spec:
 
         PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
         COMPONENT_NAME=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
+
+        echo "test yq for getting .metadata.annotations.backstage.io/kubernetes-id"
+        yq '.metadata.annotations.backstage.io/kubernetes-id' ${PUSH_PIPELINERUN}
 
         ###
         # Discover the updated images
@@ -150,19 +143,18 @@ spec:
         # Generate ConcertDef Deploy Inventory SBOM
         #
         DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
-        APP_YAML=$WORKSPACE/source/application.yaml
 
         # environment type as defined by dir names 
         #
-        ENV_TYPE="development"
+        ENV_TYPE="rhtap-app-development" # destination.namespace in application-ENV.yaml
 
         # K8 ID: backstage.io/kubernetes-id: py3svc
         #
         K8ID=$(grep "kubernetes-id" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
 
+        APP_YAML=$WORKSPACE/source/app-of-apps/application-dev.yaml
         RUNTIME_COMPONENT_NAME=${K8ID}-${ENV_TYPE}
 
-        # [application.yaml] .spec.destination.server
         API_SERVER=$(grep "server" ${APP_YAML} | sed 's/^ *server: //')
 
         CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
@@ -182,12 +174,13 @@ spec:
           --arg environment ${ENV_TYPE} \
           --arg component_name ${COMPONENT_NAME} \
           --arg component_version ${COMPONENT_VERSION} \
-          --arg deploy_number ${TIMESTAMP} \
+          --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
           --arg code_name ${CODE_COMPONENT_NAME} \
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit ${SOURCE_COMMIT} \
           --arg runtime_component_name ${RUNTIME_COMPONENT_NAME} \
           --arg api_server ${API_SERVER} \
+          --arg cluster_name ${COMPONENT_NAME} \
           --arg deploy_ns ${DEPLOY_NS} \
           --arg image_name ${IMAGE_NAME} \
           --arg image_uri ${IMAGE_URI} '
@@ -196,7 +189,7 @@ spec:
                "metadata": {
                 "timestamp": $timestamp,
                 "type": "deploy",
-                "environment": $environment,
+                "environment": "$environment",
                 "component": {
                   "name": $component_name,
                   "version": $component_version,
@@ -212,11 +205,17 @@ spec:
               ],
               "runtime-components": [
                 { "type": "kubernetes",
-                  "name": $runtime_component_name,
+                  "name": "py3svc-development", # .metadata.name in application-ENV.yaml
                   "api-server": $api_server,
+                  "properties": [
+                    {
+                      "name": "cluster_name",
+                      "value": "in-cluster"
+                    }
+                  ],
                   "components": [
                     { "type": "namespace",
-                      "name": $deploy_ns,
+                      "name": "rhtap-app-development", # same of environment
                       "components": [
                         { "type": "container",
                           "name": $image_name,
