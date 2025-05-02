@@ -15,6 +15,14 @@ spec:
       description: The target branch for the push
       name: target-branch
       type: string
+    - default: "false"
+      description: Indicator for Concert enablement
+      name: if-concert-enabled
+      type: string
+    - default: "1.0.0"
+      description: Concert component version for the build
+      name: concert-component-version
+      type: string
   tasks:
     - name: clone-repository
       params:
@@ -42,8 +50,10 @@ spec:
           value: $(tasks.clone-repository.results.commit)
         - name: source-commit-timestamp
           value: $(tasks.clone-repository.results.commit-timestamp)
-        - name: concert-enabled
-          value: $(params.concert-enabled)
+        - name: if-concert-enabled
+          value: $(params.if-concert-enabled)
+        - name: concert-component-version
+          value: $(params.concert-component-version)
       runAfter:
         - clone-repository
       taskRef:

@@ -75,8 +75,16 @@ spec:
       name: build-args-file
       type: string
     - default: "false"
-      description: Concert upload enablement flag
-      name: concert-enabled
+      description: Indicator for Concert enablement
+      name: if-concert-enabled
+      type: string
+    - default: "1.0.0"
+      description: Concert component version for the build
+      name: concert-component-version
+      type: string
+    - default: "false"
+      description: Indicator for generating & uploading Concert App SBOM
+      name: if-concert-app-sbom
       type: string
   results:
     - name: IMAGE_URL
@@ -233,8 +241,12 @@ spec:
           value: $(tasks.build-container.results.IMAGE_URL)
         - name: image-digest
           value: $(tasks.build-container.results.IMAGE_DIGEST)
-        - name: concert-enabled
-          value: $(params.concert-enabled)
+        - name: if-concert-enabled
+          value: $(params.if-concert-enabled)
+        - name: concert-component-version
+          value: $(params.concert-component-version)
+        - name: if-concert-app-sbom
+          value: $(params.if-concert-app-sbom)
       runAfter:
         - build-container
       taskRef:
