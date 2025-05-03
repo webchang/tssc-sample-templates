@@ -51,10 +51,6 @@ spec:
           value: $(workspaces.workspace.path)
       script: |
         #!/usr/bin/env bash
-
-        echo "Defined Environment Varaibles"
-        printenv
-        echo "------"
         
         if [[ ${IF_CONCERT_ENABLED} == "false" ]]; then
           echo "Skip concert-upload-ci since Concert was not enabled."
@@ -122,10 +118,6 @@ spec:
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        echo "Defined Environment Varaibles"
-        printenv
-        echo "------"
-
         PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
         COMPONENT_NAME=$(yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN})
 
@@ -134,7 +126,8 @@ spec:
         #
         IMAGE_PATHS=$(mktemp)
         pushd $WORKSPACE/source
-        git diff --name-only HEAD^ | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
+        ls -la .
+        git diff --name-only HEAD HEAD~ | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
         echo "changed images:"
         cat ${IMAGE_PATHS}
         echo "------"
@@ -144,7 +137,7 @@ spec:
         #
         ENV_TYPE="development"
 
-        IMAGE_NAME="quay.io/org4rong/py3img"
+        IMAGE_NAME="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d"
         IMAGE_URI="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d@sha256:3c1fbab8a4fe195270c6bc71a92a0b8a1a35108933d9080b19dcc8e7771ed088"
 
         APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-dev.yaml"
@@ -194,7 +187,7 @@ spec:
                 { "type": "code",
                   "name": $code_name,
                   "purl": $code_purl,
-                  "commit_sha", $code_commit
+                  "commit_sha": $code_commit
                 }
               ],
               "runtime-components": [
@@ -213,7 +206,7 @@ spec:
                       "components": [
                         { "type": "container",
                           "name": $image_name,
-                          "uri": $image_name
+                          "uri": $image_uri
                         }
                       ]
                     }
