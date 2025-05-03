@@ -62,12 +62,6 @@ spec:
           exit 0
         fi
 
-        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
-        if [ ! -s ${PUSH_PIPELINERUN} ]; then
-          echo "PipelineRun file is empty or unavailable: ${PUSH_PIPELINERUN}"
-          exit 1
-        fi
-
         tempfile=$(mktemp)
 
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -118,114 +112,150 @@ spec:
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        PUSH_PIPELINERUN=$WORKSPACE/source/.tekton/gitops-on-push.yaml
-        COMPONENT_NAME=$(yq '.metadata.labels."backstage.io/kubernetes-id"' ${PUSH_PIPELINERUN})
+        GITOPS_APP_OF_APP=$WORKSPACE/source/application.yaml
+        COMPONENT_NAME=$(yq '.metadata.name' ${GITOPS_APP_OF_APP})
 
         ###
-        # Discover the updated images
+        # Discover updated images in the latest commit
         #
-        echo $HOME
-        ls -la $HOME
+        cd $WORKSPACE/source
 
-        IMAGE_PATHS=$(mktemp)
+        GITOPS_UPDATES=$(mktemp)
+        git log --pretty=format: --name-only -n 1 HEAD \
+          | grep "components/${COMPONENT_NAME}/overlays" \
+          | tee $GITOPS_UPDATES
 
-        pushd $WORKSPACE/source
-        ls -la .
+        if [[ ! -s GITOPS_UPDATES ]]; then
+          echo "Latest git commit did not make any change to in-scope deployment overlay files."
+          echo "There is no need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM."
+          exit 0
+        fi
 
-        git rev-parse HEAD
+        GITOPS_ARRAY=()
+        while IFS= read -r filepath; do
+          GITOPS_ARRAY+=("$filepath")
+        done < GITOPS_UPDATES
 
-        git show HEAD
-        git show HEAD~1
-
-        git diff --name-only HEAD HEAD~1 | grep "deployment-patch.yaml" | sort > ${IMAGE_PATHS}
-        echo "changed images:"
-        cat ${IMAGE_PATHS}
+        for overlay_file in "${GITOPS_ARRAY[@]}"; do
+          echo "Overlay file path in $WORKSPACE/source: ${overlay_file}"
+        done
         echo "------"
-        popd
-
-        # environment type as defined by dir names 
-        #
-        ENV_TYPE="development"
-
-        IMAGE_NAME="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d"
-        IMAGE_URI="quay.io/org4rong/py3img:f1c9b19f48e2baeb0569c1a885ee414fd397b41d@sha256:3c1fbab8a4fe195270c6bc71a92a0b8a1a35108933d9080b19dcc8e7771ed088"
-
-        APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-dev.yaml"
 
         ###
         # Generate ConcertDef Deploy Inventory SBOM
         ###
 
-        DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
-        CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
+        for overlay_file in "${GITOPS_ARRAY[@]}"; do
 
-        RHDH_APP_INSTANCE=$(yq '.metadata.name' ${APP_DEF_YAML})
-        RHDH_K8_ID=${COMPONENT_NAME}
-        RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_YAML})
-        RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_YAML})
+          ###
+          # Discover deployment environments type and image URI & name (path+tag)
+          #
+          ENV_TYPE=$(echo "${overlay_file}" | cut -d '/' -f 3)
+          echo "GitOps deployment environment: ${ENV_TYPE}"
 
-        ###
-        # Initialize deploy inventory SBOM with a container object
-        #
-        jq --arg timestamp ${TIMESTAMP} \
-          --arg app_env ${RHDH_APP_INSTANCE} \
-          --arg component_name ${COMPONENT_NAME} \
-          --arg component_version ${COMPONENT_VERSION} \
-          --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
-          --arg code_name ${CODE_COMPONENT_NAME} \
-          --arg code_purl ${SOURCE_URL} \
-          --arg code_commit ${SOURCE_COMMIT} \
-          --arg runtime_component_name ${RHDH_APP_INSTANCE} \
-          --arg api_server ${RHDH_K8_SERVER} \
-          --arg cluster_id ${RHDH_K8_ID} \
-          --arg k8ns ${RHDH_K8_NS} \
-          --arg image_name ${IMAGE_NAME} \
-          --arg image_uri ${IMAGE_URI} '
-            { "bomFormat": "ConcertDef",
-              "specVersion": "1.0.2",
-               "metadata": {
-                "timestamp": $timestamp,
-                "type": "deploy",
-                "environment": $app_env,
-                "component": {
-                  "name": $component_name,
-                  "version": $component_version,
-                  "deploy-number": $deploy_number
-                }
-              },
-              "components": [
-                { "type": "code",
-                  "name": $code_name,
-                  "purl": $code_purl,
-                  "commit_sha": $code_commit
-                }
-              ],
-              "runtime-components": [
-                { "type": "kubernetes",
-                  "name": $app_env,
-                  "api-server": $api_server,
-                  "properties": [
-                    {
-                      "name": "cluster_id",
-                      "value": $cluster_id
-                    }
-                  ],
-                  "components": [
-                    { "type": "namespace",
-                      "name": $k8ns,
-                      "components": [
-                        { "type": "container",
-                          "name": $image_name,
-                          "uri": $image_uri
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-        ' -n > ${DEPLOY_SBOM}
-        jq . ${DEPLOY_SBOM}
+          OVERLAY_YAML=$WORKSPACE/source/${overlay_file}
+          IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${OVERLAY_YAML})
+          IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 0)
+          if [[ -z ${IMAGE_NAME} ]]; then
+            echo "encourntered an empty image name, continue"
+            continue
+          fi
+
+          ###
+          # Discover environment-dependent application definition YAML 
+          #
+          if [[ ENV_TYPE == "development" ]]; then
+            if [[ -s $WORKSPACE/source/app-of-apps/application-dev.yaml ]]; then
+              APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-dev.yaml"
+            elif [ -s $WORKSPACE/source/app-of-apps/application-development.yaml ]]
+              APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-development.yaml"
+            else
+              echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
+              continue
+            fi
+          elif [[ -s $WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml ]]; then
+              APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml"
+            else
+              echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
+              continue
+            fi
+          fi
+
+          ###
+          # Generate ConcertDef Deploy Inventory SBOM
+          #
+          DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
+          CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
+
+          RHDH_APP_INSTANCE=$(yq '.metadata.name' ${APP_DEF_YAML})
+          RHDH_K8_ID=${COMPONENT_NAME}
+          RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_YAML})
+          RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_YAML})
+
+          ###
+          # Initialize deploy inventory SBOM with a container object
+          #
+          jq --arg timestamp ${TIMESTAMP} \
+            --arg app_env ${RHDH_APP_INSTANCE} \
+            --arg component_name ${COMPONENT_NAME} \
+            --arg component_version ${COMPONENT_VERSION} \
+            --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
+            --arg code_name ${CODE_COMPONENT_NAME} \
+            --arg code_purl ${SOURCE_URL} \
+            --arg code_commit ${SOURCE_COMMIT} \
+            --arg runtime_component_name ${RHDH_APP_INSTANCE} \
+            --arg api_server ${RHDH_K8_SERVER} \
+            --arg cluster_id ${RHDH_K8_ID} \
+            --arg k8ns ${RHDH_K8_NS} \
+            --arg image_name ${IMAGE_NAME} \
+            --arg image_uri ${IMAGE_URI} '
+              { "bomFormat": "ConcertDef",
+                "specVersion": "1.0.2",
+                "metadata": {
+                  "timestamp": $timestamp,
+                  "type": "deploy",
+                  "environment": $app_env,
+                  "component": {
+                    "name": $component_name,
+                    "version": $component_version,
+                    "deploy-number": $deploy_number
+                  }
+                },
+                "components": [
+                  { "type": "code",
+                    "name": $code_name,
+                    "purl": $code_purl,
+                    "commit_sha": $code_commit
+                  }
+                ],
+                "runtime-components": [
+                  { "type": "kubernetes",
+                    "name": $app_env,
+                    "api-server": $api_server,
+                    "properties": [
+                      {
+                        "name": "cluster_id",
+                        "value": $cluster_id
+                      }
+                    ],
+                    "components": [
+                      { "type": "namespace",
+                        "name": $k8ns,
+                        "components": [
+                          { "type": "container",
+                            "name": $image_name,
+                            "uri": $image_uri
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+          ' -n > ${DEPLOY_SBOM}
+          jq . ${DEPLOY_SBOM}
+        done
+
 
         # ###
         # # Upload ConcertDef DEPLOY Inventory SBOM
