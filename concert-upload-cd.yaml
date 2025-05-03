@@ -244,6 +244,10 @@ spec:
                     ]
                   }
               ' -n > ${DEPLOY_SBOM}
+              if [ ! -s ${DEPLOY_SBOM} ]; then
+                echo "Empty file: ${DEPLOY_SBOM}"
+                exit 1
+              fi
               jq . ${DEPLOY_SBOM}
               
               ###
