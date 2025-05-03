@@ -114,47 +114,22 @@ spec:
         # Discover updated images in the latest commit
         #
         cd $WORKSPACE/source
-        ls -ld .git
-        ls -l .git
-        cat .git/HEAD
-        echo "------"
-        cat .git/FETCH_HEAD
-        echo "======"
-        git --version
-
-        git config -l
-        echo "=================="
-
-        echo "git rev-parse HEAD"
-        git rev-parse HEAD | tee git-test.txt
-        echo "------"
-        git log --pretty=format: --name-only -n 1 $(cat git-test.txt)
-        echo "----------------------"
 
         GITOPS_UPDATES=$(mktemp)
-        git log --pretty=format: --name-only -n 1 HEAD \
+        git log --raw -n 1 HEAD \
           | grep "components/${COMPONENT_NAME}/.*-patch.yaml" \
           | tee ${GITOPS_UPDATES}
+
+        # GITOPS_UPDATES=$(mktemp)
+        # git log --pretty=format: --name-only -n 1 HEAD \
+        #   | grep "components/${COMPONENT_NAME}/.*-patch.yaml" \
+        #   | tee ${GITOPS_UPDATES}
 
         if [[ ! -s ${GITOPS_UPDATES} ]]; then
           echo "Latest git commit did not make any change to in-scope deployment overlay files."
           echo "There is no need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM."
           exit 0
         fi
-
-        echo "git config core.filemode false"
-        git config core.filemode false
-
-        echo "===> git show --name-only HEAD"
-        git show --name-only HEAD
-        echo "------"
-
-        echo "git config core.filemode true"
-        git config core.filemode true
-
-        echo "===> git show --name-only HEAD"
-        git show --name-only HEAD
-        echo "------"
 
         GITOPS_ARRAY=()
         while IFS= read -r filepath; do
