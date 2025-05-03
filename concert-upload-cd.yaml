@@ -115,8 +115,32 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+        echo "git log -p"
+        git log -p
+        echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+
+        echo "####################"
+        echo "git log --raw"
+        git log -raw
+        echo "####################"
+
+        echo "####################@@@@@@@@@@@@@@@@@@@"
         echo "git log --raw -n 3"
         git log --raw -n 3
+        echo "####################@@@@@@@@@@@@@@@@@@@"
+
+        echo "++++++++++++++++++++++++++++++++"
+        echo "git log --raw -n 1 HEAD"
+        git log --raw -n 1 HEAD
+        echo "++++++++++++++++++++++++++++++++"
+
+        echo "**************************"
+        git log --pretty=format: --name-only -n 1 HEAD
+        git log --pretty=format: --name-only -n 1 HEAD
+        echo "**************************"
+
+        exit 0
 
         GITOPS_UPDATES=$(mktemp)
         git log --raw -n 1 HEAD \
