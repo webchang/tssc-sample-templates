@@ -115,6 +115,9 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "git log --raw -n 3"
+        git log --raw -n 3
+
         GITOPS_UPDATES=$(mktemp)
         git log --raw -n 1 HEAD \
           | grep "components/${COMPONENT_NAME}/.*-patch.yaml" \
