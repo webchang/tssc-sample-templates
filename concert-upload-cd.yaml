@@ -115,6 +115,11 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "============"
+        echo "git log --raw -n 1 HEAD"
+        git log --raw -n 1 HEAD
+        echo "============"
+
         IMG_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*component image" \
           | cut -d ':' -f 2 | sed 's/^ *//' | tee ${IMG_FILE}
