@@ -122,7 +122,7 @@ spec:
 
         IMG_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*component image" \
-          | cut -d ':' -f 2 | sed 's/^ *//' | tee ${IMG_FILE}
+          | sed 's/^.*: //' | tee ${IMG_FILE}
         if [[ ! -s ${IMG_FILE} ]]; then
           echo "No deployment patch files were changed"
           echo "No need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM"
