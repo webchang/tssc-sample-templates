@@ -255,7 +255,7 @@ spec:
         if [ -s ${CYCLONEDX_SBOM} ]; then
           sbom_num=$(jq '.serialNumber' ${CYCLONEDX_SBOM})
           sbom_ver=$(jq '.version' ${CYCLONEDX_SBOM})
-          export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$sbom_ver"
+          export SBOM_LINK="$(echo $sbom_num | sed 's/\"//g' )/$sbom_ver"
           echo "BOM-LINK of SBOM: ${SBOM_LINK}"
 
           jq --arg sbom_link ${SBOM_LINK} '
