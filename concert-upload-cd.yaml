@@ -115,14 +115,21 @@ spec:
         #
         cd $WORKSPACE/source
 
-        echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+        echo "#####################"
+        echo "git config core.fileMode false"
+        git config core.fileMode false
+
+        git config -l
+        echo "#####################"
+        
+        echo "----------------------------------------------"
         echo "git log -p"
         git log -p
-        echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+        echo "----------------------------------------------"
 
         echo "####################"
         echo "git log --raw"
-        git log -raw
+        git log --raw
         echo "####################"
 
         echo "####################@@@@@@@@@@@@@@@@@@@"
