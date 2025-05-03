@@ -122,6 +122,12 @@ spec:
         echo "======"
         git --version
 
+        echo "git rev-parse HEAD"
+        git rev-parse HEAD | tee git-test.txt
+        echo "------"
+        git log --pretty=format: --name-only -n 1 $(cat git-test.txt) \
+        echo "----------------------"
+
         GITOPS_UPDATES=$(mktemp)
         git log --pretty=format: --name-only -n 1 HEAD \
           | grep "components/${COMPONENT_NAME}/.*-patch.yaml" \
@@ -136,9 +142,6 @@ spec:
         echo "===> git show --name-only HEAD"
         git show --name-only HEAD
         echo "------"
-
-        git log --pretty=format: --name-only -n 1 HEAD~1 \
-          | grep "components/${COMPONENT_NAME}/.*-patch.yaml" 
 
         GITOPS_ARRAY=()
         while IFS= read -r filepath; do
