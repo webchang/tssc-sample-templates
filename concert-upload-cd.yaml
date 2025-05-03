@@ -145,12 +145,12 @@ spec:
           ###
           # Discover deployment environments type and image URI & name (path+tag)
           #
-          ENV_TYPE=$(echo "${overlay_file}" | cut -d '/' -f 3)
+          ENV_TYPE=$(echo "${overlay_file}" | cut -d '/' -f 4)
           echo "GitOps deployment environment: ${ENV_TYPE}"
 
           OVERLAY_YAML=$WORKSPACE/source/${overlay_file}
           IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${OVERLAY_YAML})
-          IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 0)
+          IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 1)
           if [[ -z ${IMAGE_NAME} ]]; then
             echo "encourntered an empty image name, continue"
             continue
