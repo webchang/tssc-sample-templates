@@ -281,6 +281,10 @@ spec:
             ]
         ' ${BUILD_SBOM} > $tempfile
         cp $tempfile ${BUILD_SBOM}
+        if [ ! -s ${BUILD_SBOM} ]; then
+          echo "Empty file: ${BUILD_SBOM}"
+          exit 1
+        fi
         jq . ${BUILD_SBOM}
 
         ###
@@ -324,7 +328,7 @@ spec:
           --arg app_name ${APP_NAME} \
           --arg app_version ${COMPONENT_VERSION} \
           --arg component_name ${COMPONENT_NAME} \
-          --arg component_version ${COMPONENT_VERSION}
+          --arg component_version ${COMPONENT_VERSION} \
           --arg env_dev ${APP_NAME}-development \
           --arg env_stage ${APP_NAME}-stage \
           --arg env_prod ${APP_NAME}-prod '
@@ -367,6 +371,10 @@ spec:
               ]
             }
         ' -n > ${APP_SBOM}
+        if [ ! -s ${APP_SBOM} ]; then
+          echo "Empty file: ${APP_SBOM}"
+          exit 1
+        fi
         jq . ${APP_SBOM}
 
         ###
