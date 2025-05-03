@@ -115,13 +115,8 @@ spec:
         #
         cd $WORKSPACE/source
 
-        echo "============"
-        echo "git log --raw -n 1 HEAD"
-        git log --raw -n 1 HEAD
-        echo "============"
-
         IMG_FILE=$(mktemp)
-        git log --raw -n 1 HEAD | grep "^ *Update.*component image" \
+        git log --raw -n 1 HEAD | grep "^ *Update.*image" \
           | sed 's/^.*: //' | tee ${IMG_FILE}
         if [[ ! -s ${IMG_FILE} ]]; then
           echo "No deployment patch files were changed"
@@ -137,7 +132,6 @@ spec:
         PATCH_ARRAY=()
         while IFS= read -r patch_yaml; do
           PATCH_ARRAY+=("${patch_yaml}")
-          echo "new patch path: $WORKSPACE/source/${patch_yaml}"
         done < ${PATCH_FILE}
 
         while IFS= read -r img_url; do
@@ -150,7 +144,6 @@ spec:
               # Discover deployment environments type and image URI & name (path+tag)
               #
               ENV_TYPE=$(echo "${patch_yaml}" | cut -d '/' -f 4)
-              echo "GitOps deployment environment: ${ENV_TYPE}"
 
               IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${patch_path})
               IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 1)
@@ -160,7 +153,7 @@ spec:
               fi
 
               ###
-              # Discover environment-dependent application definition YAML 
+              # Discover environment-dependent template of app component instnace  
               #
               if [[ ${ENV_TYPE} == "development" ]]; then
                 if [[ -s $WORKSPACE/source/app-of-apps/application-dev.yaml ]]; then
@@ -177,6 +170,7 @@ spec:
                 echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
                 continue
               fi
+              echo "GitOps app-of-apps component instance template: ${APP_DEF_YAML}"
 
               ###
               # Generate ConcertDef Deploy Inventory SBOM
@@ -251,28 +245,28 @@ spec:
                   }
               ' -n > ${DEPLOY_SBOM}
               jq . ${DEPLOY_SBOM}
+              
+              ###
+              # Upload ConcertDef DEPLOY Inventory SBOM
+              #
+              UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+              AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+              AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+              curl -X POST -sS "${UPLOAD_URL}" \
+                -H 'accept: application/json' \
+                -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+                -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
+                -H 'Content-Type: multipart/form-data' \
+                -F "data_type=application_sbom" \
+                -F "filename=@${DEPLOY_SBOM}" \
+                2>&1 > $tempfile
 
-              # ###
-              # # Upload ConcertDef DEPLOY Inventory SBOM
-              # #
-              # UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
-              # AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
-              # AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
-              # curl -X POST -sS "${UPLOAD_URL}" \
-              #   -H 'accept: application/json' \
-              #   -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
-              #   -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
-              #   -H 'Content-Type: multipart/form-data' \
-              #   -F "data_type=application_sbom" \
-              #   -F "filename=@${DEPLOY_SBOM}" \
-              #   2>&1 > $WORKSPACE/log.txt
-
-              # if [[ $? == 0 ]]; then
-              #   echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
-              # else
-              #   echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
-              #   cat $WORKSPACE/log.txt
-              # fi
+              if [[ $? == 0 ]]; then
+                echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
+              else
+                echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
+                cat $tempfile
+              fi
             fi
           done
         done < ${IMG_FILE}
