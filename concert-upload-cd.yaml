@@ -122,10 +122,13 @@ spec:
         echo "======"
         git --version
 
+        git config -l
+        echo "=================="
+
         echo "git rev-parse HEAD"
         git rev-parse HEAD | tee git-test.txt
         echo "------"
-        git log --pretty=format: --name-only -n 1 $(cat git-test.txt) \
+        git log --pretty=format: --name-only -n 1 $(cat git-test.txt)
         echo "----------------------"
 
         GITOPS_UPDATES=$(mktemp)
@@ -138,6 +141,16 @@ spec:
           echo "There is no need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM."
           exit 0
         fi
+
+        echo "git config core.filemode false"
+        git config core.filemode false
+
+        echo "===> git show --name-only HEAD"
+        git show --name-only HEAD
+        echo "------"
+
+        echo "git config core.filemode true"
+        git config core.filemode true
 
         echo "===> git show --name-only HEAD"
         git show --name-only HEAD
