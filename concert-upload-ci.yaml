@@ -324,7 +324,10 @@ spec:
           --arg app_name ${APP_NAME} \
           --arg app_version ${COMPONENT_VERSION} \
           --arg component_name ${COMPONENT_NAME} \
-          --arg component_version ${COMPONENT_VERSION} '
+          --arg component_version ${COMPONENT_VERSION}
+          --arg env_dev ${APP_NAME}-development \
+          --arg env_stage ${APP_NAME}-stage \
+          --arg env_prod ${APP_NAME}-prod '
             { "bomFormat": "ConcertDef",
               "specVersion": "1.0.2",
               "metadata": {
@@ -346,6 +349,20 @@ spec:
                 { "type": "build",
                   "name": $component_name,
                   "version": $component_version
+                }
+              ],
+              "environments": [
+                {
+                  "type": "environment",
+                  "name": $env_dev
+                },
+                {
+                  "type": "environment",
+                  "name": $env_stage
+                },
+                {
+                  "type": "environment",
+                  "name": $env_prod
                 }
               ]
             }
