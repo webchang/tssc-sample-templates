@@ -104,11 +104,6 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        if ! command -v yq 2>&1 /dev/null; then
-          echo "install yq"
-          snap install yq
-        fi
-
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -122,10 +117,10 @@ spec:
 
         GITOPS_UPDATES=$(mktemp)
         git log --pretty=format: --name-only -n 1 HEAD \
-          | grep "components/${COMPONENT_NAME}/overlays" \
-          | tee $GITOPS_UPDATES
+          | grep "components/${COMPONENT_NAME}/.*-patch.yaml" \
+          | tee ${GITOPS_UPDATES}
 
-        if [[ ! -s GITOPS_UPDATES ]]; then
+        if [[ ! -s ${GITOPS_UPDATES} ]]; then
           echo "Latest git commit did not make any change to in-scope deployment overlay files."
           echo "There is no need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM."
           exit 0
@@ -134,7 +129,7 @@ spec:
         GITOPS_ARRAY=()
         while IFS= read -r filepath; do
           GITOPS_ARRAY+=("$filepath")
-        done < GITOPS_UPDATES
+        done < ${GITOPS_UPDATES}
 
         for overlay_file in "${GITOPS_ARRAY[@]}"; do
           echo "Overlay file path in $WORKSPACE/source: ${overlay_file}"
