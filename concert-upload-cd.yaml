@@ -169,11 +169,10 @@ spec:
               continue
             fi
           elif [[ -s $WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml ]]; then
-              APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml"
-            else
-              echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
-              continue
-            fi
+            APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml"
+          else
+            echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
+            continue
           fi
 
           ###
