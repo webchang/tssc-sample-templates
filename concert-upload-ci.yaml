@@ -178,10 +178,9 @@ spec:
         if [ -s ${CYCLONEDX_SBOM} ]; then
           # Replace SBOM component name with image path+tag
           #
-          jq ${CYCLONEDX_SBOM} \
-            --arg image_url ${IMAGE_URL} '
+          jq --arg image_url ${IMAGE_URL} '
               .metadata.component.name = $image_url
-          ' > $tempfile
+          ' ${CYCLONEDX_SBOM} > $tempfile
           cp $tempfile ${CYCLONEDX_SBOM}
 
           ###
@@ -224,8 +223,7 @@ spec:
 
         # Initialize build inventory SBOM with a container object
         #
-        jq -n \
-          --arg timestamp ${TIMESTAMP} \
+        jq --arg timestamp ${TIMESTAMP} \
           --arg component_name ${COMPONENT_NAME} \
           --arg component_version ${COMPONENT_VERSION} \
           --arg build_number ${SOURCE_COMMIT_TIMESTAMP} \
@@ -249,9 +247,8 @@ spec:
                 }
               ]
             }
-        ' > ${BUILD_SBOM}
+        ' -n > ${BUILD_SBOM}
         ls -l ${BUILD_SBOM}
-        jq . ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
         #
@@ -261,10 +258,9 @@ spec:
           export SBOM_LINK="$(echo $sbom_num | sed s/\"//g )/$sbom_ver"
           echo "BOM-LINK of SBOM: ${SBOM_LINK}"
 
-          jq ${BUILD_SBOM} \
-            --arg sbom_link ${SBOM_LINK} '
+          jq --arg sbom_link ${SBOM_LINK} '
               .components[0] += {"cyclonedx-bom-link": $sbom_link}
-          ' > $tempfile
+          ' ${BUILD_SBOM} > $tempfile
           cp $tempfile ${BUILD_SBOM}
         else
           echo "File is empty or does not exist: ${CYCLONEDX_SBOM}"
@@ -273,8 +269,7 @@ spec:
         # Add a code object to the build inventory SBOM
         #
         CODE_NAME=$(basename $SOURCE_URL)
-        jq ${BUILD_SBOM} \
-          --arg code_name ${CODE_NAME} \
+        jq --arg code_name ${CODE_NAME} \
           --arg code_purl ${SOURCE_URL} \
           --arg code_commit_sha ${SOURCE_COMMIT} '
             .components += [
@@ -284,7 +279,7 @@ spec:
                 "commit_sha": $code_commit_sha
               }
             ]
-        ' > $tempfile
+        ' ${BUILD_SBOM} > $tempfile
         cp $tempfile ${BUILD_SBOM}
         jq . ${BUILD_SBOM}
 
@@ -325,8 +320,7 @@ spec:
         APP_NAME=$(grep "argocd/app-name" ${PUSH_PIPELINERUN} | cut -d ':' -f 2 | sed 's/^ *//')
         APP_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-app.json
 
-        jq -n \
-          --arg timestamp ${TIMESTAMP} \
+        jq --arg timestamp ${TIMESTAMP} \
           --arg app_name ${APP_NAME} \
           --arg app_version ${COMPONENT_VERSION} \
           --arg component_name ${COMPONENT_NAME} \
@@ -355,8 +349,7 @@ spec:
                 }
               ]
             }
-        ' > $tempfile
-        cp $tempfile ${APP_SBOM}
+        ' -n > ${APP_SBOM}
         jq . ${APP_SBOM}
 
         ###
