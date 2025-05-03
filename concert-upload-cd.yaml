@@ -159,10 +159,10 @@ spec:
           ###
           # Discover environment-dependent application definition YAML 
           #
-          if [[ ENV_TYPE == "development" ]]; then
+          if [[ ${ENV_TYPE} == "development" ]]; then
             if [[ -s $WORKSPACE/source/app-of-apps/application-dev.yaml ]]; then
               APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-dev.yaml"
-            elif [ -s $WORKSPACE/source/app-of-apps/application-development.yaml ]]
+            elif [ -s $WORKSPACE/source/app-of-apps/application-development.yaml ]]; then
               APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-development.yaml"
             else
               echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
