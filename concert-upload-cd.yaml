@@ -114,6 +114,13 @@ spec:
         # Discover updated images in the latest commit
         #
         cd $WORKSPACE/source
+        ls -ld .git
+        ls -l .git
+        cat .git/HEAD
+        echo "------"
+        cat .git/FETCH_HEAD
+        echo "======"
+        git --version
 
         GITOPS_UPDATES=$(mktemp)
         git log --pretty=format: --name-only -n 1 HEAD \
@@ -126,6 +133,13 @@ spec:
           exit 0
         fi
 
+        echo "===> git show --name-only HEAD"
+        git show --name-only HEAD
+        echo "------"
+
+        git log --pretty=format: --name-only -n 1 HEAD~1 \
+          | grep "components/${COMPONENT_NAME}/.*-patch.yaml" 
+
         GITOPS_ARRAY=()
         while IFS= read -r filepath; do
           GITOPS_ARRAY+=("$filepath")
@@ -133,6 +147,7 @@ spec:
 
         for overlay_file in "${GITOPS_ARRAY[@]}"; do
           echo "Overlay file path in $WORKSPACE/source: ${overlay_file}"
+          ls -l $WORKSPACE/source/${overlay_file}
         done
         echo "------"
 
