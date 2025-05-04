@@ -391,10 +391,10 @@ spec:
 
         for env_kind in ${ARRAY_ENV[@]}; do
           jq --arg env_name ${APP_NAME}-${env_kind} '
-            .environments += {
+            .environments += [{
               "type": "environment",
               "value": $env_name
-            }
+            }]
           ' ${APP_SBOM} > $tempfile
           cp $tempfile ${APP_SBOM}
         done
