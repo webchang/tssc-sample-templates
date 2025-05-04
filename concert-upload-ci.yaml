@@ -34,10 +34,7 @@ spec:
       default: "false"
     - name: concert-env-kinds
       type: array
-      default:
-        - "development"
-        - "stage"
-        - "prod"
+      default: ["development", "stage", "prod"]
   workspaces:
     - name: concert-api
       description: Concert API endpoint and credentials
