@@ -77,30 +77,42 @@ spec:
         cd ${gitops_repo_name}
 
         component_name=$(yq .metadata.name application.yaml)
-        deployment_patch_filepath="components/${component_name}/overlays/development/deployment-patch.yaml"
+        overlays_filepath="components/${component_name}/overlays"
+        patch_filename="deployment-patch.yaml"
+
+        ###
+        # Chang image URI in development patch YAML: .spec.template.spec.containers.image
+        #
+        deployment_patch_filepath="${overlays_filepath}/development/${patch_filename}"
         IMAGE_PATH='.spec.template.spec.containers[0].image'
         old_image=$(yq "${IMAGE_PATH}" "${deployment_patch_filepath}")
         yq e -i "${IMAGE_PATH} |= \"${PARAM_IMAGE}\"" "${deployment_patch_filepath}"
 
-        echo "*** Add source code URL and revision to .metadata.annotations"
-        echo "*** Source repo URL: $PARAM_URL"
-        echo "*** Source repo revision: $PARAM_REV"
+        ###
+        # Add annotation source-url & source-revision to deployment_patch YAML files 
+        #
+        readarray -t ARRAY_ENV < <(ls -1 ${overlays_filepath})
+        echo "deployment environments: ${ARRAY_ENV[@]}"
+
         export PARAM_URL
         export PARAM_REV
 
-        # add/replace annotation(source-url) for source repo URL
-        #
-        yq -i 'with(.metadata.annotations;
-            with((.[] | select(.source-url)) // (. += {"source-url": strenv(PARAM_URL)}); .source-url = strenv(PARAM_URL))
-          ) |
-          .metadata.annotations.source-url style="double"' "${deployment_patch_filepath}"
+        for env_name in "${ARRAY_ENV[@]}"; do
+          deployment_patch_filepath="${overlays_filepath}/${env_name}/${patch_filename}"
+          echo "Add annotations source-url & source-revision to ${deployment_patch_filepath}"
 
-        # add/replace annotation (source-revision) for source repo revision
-        #
-        yq -i 'with(.metadata.annotations;
-            with((.[] | select(.source-revision)) // (. += {"source-revision": strenv(PARAM_REV)}); .source-revision = strenv(PARAM_REV))
-          ) |
-          .metadata.annotations.source-revision style="double"' "${deployment_patch_filepath}"
+          yq -i 'with(.metadata.annotations;
+              with((.[] | select(.source-url)) // (. += {"source-url": strenv(PARAM_URL)}); .source-url = strenv(PARAM_URL))
+            ) |
+            .metadata.annotations.source-url style="double"' "${deployment_patch_filepath}"
+
+          # add/replace annotation (source-revision) for source repo revision
+          #
+          yq -i 'with(.metadata.annotations;
+              with((.[] | select(.source-revision)) // (. += {"source-revision": strenv(PARAM_REV)}); .source-revision = strenv(PARAM_REV))
+            ) |
+            .metadata.annotations.source-revision style="double"' "${deployment_patch_filepath}"
+        done
     
         git add .
         git commit -m "Update '${component_name}' component image to: ${PARAM_IMAGE}"
