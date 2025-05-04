@@ -32,6 +32,12 @@ spec:
     - name: if-concert-app-sbom
       type: string
       default: "false"
+    - name: concert-env-kinds
+      type: array
+      default:
+        - "development"
+        - "stage"
+        - "prod"
   workspaces:
     - name: concert-api
       description: Concert API endpoint and credentials
@@ -163,6 +169,8 @@ spec:
           value: $(params.concert-component-version)
         - name: IF_CONCERT_APP_SBOM
           value: $(params.if-concert-app-sbom)
+        - name: CONCERT_ENV_KINDS
+        - value: $(params.concert-env-kinds)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -375,6 +383,21 @@ spec:
           echo "Empty file: ${APP_SBOM}"
           exit 1
         fi
+
+        ###
+        # Add environment objects
+        #
+        echo "Concert env kinds: ${CONCERT_ENV_KINDS[@]}"
+
+        for env_kind in ${CONCERT_ENV_KINDS[@]}; do
+          jq --arg env_name ${APP_NAME}-${env_kind} '
+            .environments += {
+              "type": "environment",
+              "value": $env_name
+            }
+          ' ${APP_SBOM} > $tempfile
+          cp $tempfile ${APP_SBOM}
+        done
         jq . ${APP_SBOM}
 
         ###

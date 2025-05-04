@@ -86,6 +86,13 @@ spec:
       description: Indicator for generating & uploading Concert App SBOM
       name: if-concert-app-sbom
       type: string
+    - default:
+        - "development"
+        - "stage"
+        - "prod"
+      description: Deployment environment kinds for Concert
+      name: concert-env-kinds
+      type: array
   results:
     - name: IMAGE_URL
       value: $(tasks.build-container.results.IMAGE_URL)
@@ -247,6 +254,8 @@ spec:
           value: $(params.concert-component-version)
         - name: if-concert-app-sbom
           value: $(params.if-concert-app-sbom)
+        - name: concert-env-kinds
+          value: $(params.concert-env-kinds)
       runAfter:
         - build-container
       taskRef:
