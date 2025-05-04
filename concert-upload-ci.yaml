@@ -359,20 +359,6 @@ spec:
                   "name": $component_name,
                   "version": $component_version
                 }
-              ],
-              "environments": [
-                {
-                  "type": "environment",
-                  "name": $env_dev
-                },
-                {
-                  "type": "environment",
-                  "name": $env_stage
-                },
-                {
-                  "type": "environment",
-                  "name": $env_prod
-                }
               ]
             }
         ' -n > ${APP_SBOM}
@@ -386,8 +372,6 @@ spec:
         #
         echo "Concert env kinds: ${CONCERT_ENV_KINDS}"
         readarray -t ARRAY_ENV < <(jq -r '.[]' <<< "$CONCERT_ENV_KINDS")
-
-        echo "env list: ${ARRAY_ENV[@]}"
 
         for env_kind in ${ARRAY_ENV[@]}; do
           jq --arg env_name ${APP_NAME}-${env_kind} '
