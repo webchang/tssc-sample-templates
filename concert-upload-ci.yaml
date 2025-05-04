@@ -33,8 +33,8 @@ spec:
       type: string
       default: "false"
     - name: concert-env-kinds
-      type: array
-      default: [development, stage, prod]
+      type: string
+      default: '["development", "stage", "prod"]'
   workspaces:
     - name: concert-api
       description: Concert API endpoint and credentials
@@ -384,9 +384,12 @@ spec:
         ###
         # Add environment objects
         #
-        echo "Concert env kinds: ${CONCERT_ENV_KINDS[@]}"
+        echo "Concert env kinds: ${CONCERT_ENV_KINDS}"
+        readarray -t ARRAY_ENV < <(jq -r '.[]' <<< "$CONCERT_ENV_KINDS")
 
-        for env_kind in ${CONCERT_ENV_KINDS[@]}; do
+        echo "env list: ${ARRAY_ENV[@]}"
+
+        for env_kind in ${ARRAY_ENV[@]}; do
           jq --arg env_name ${APP_NAME}-${env_kind} '
             .environments += {
               "type": "environment",
