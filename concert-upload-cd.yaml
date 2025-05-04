@@ -25,6 +25,12 @@ spec:
     - name: concert-component-version
       type: string
       default: "1.0.0"
+    - name: concert-api-base
+      type: string
+      default: ""
+    - name: concert-api-exposure
+      type: string
+      default: "private"
   workspaces:
     - name: concert-api
       description: Concert API endpoint and credentials
@@ -86,7 +92,7 @@ spec:
           exit 1
         fi
 
-    - name: upload-concertdef-deploy-app
+    - name: upload-concertdef-deploy
       image: quay.io/konflux-ci/appstudio-utils:48c311af02858e2422d6229600e9959e496ddef1@sha256:91ddd999271f65d8ec8487b10f3dd378f81aa894e11b9af4d10639fd52bba7e8
       env:
         - name: SOURCE_URL
@@ -97,6 +103,10 @@ spec:
           value: $(params.source-commit-timestamp)
         - name: COMPONENT_VERSION
           value: $(params.concert-component-version)
+        - name: API_BASE
+          value: $(params.concert-api-base)
+        - name: API_EXPOSURE
+          value: $(params.concert-api-exposure)
         - name: WORKSPACE_CONCERT_API
           value: $(workspaces.concert-api.path)
         - name: WORKSPACE
@@ -233,7 +243,8 @@ spec:
                           { "type": "namespace",
                             "name": $k8ns,
                             "components": [
-                              { "type": "container",
+                              { "bom-red": "container:$image_name",
+                                "type": "container",
                                 "name": $image_name,
                                 "uri": $image_uri
                               }
@@ -248,8 +259,60 @@ spec:
                 echo "Empty file: ${DEPLOY_SBOM}"
                 exit 1
               fi
+
+              ###
+              # Add service and dependency objects
+              #
+              if [[ $API_BASE == "" ]]; then
+                SERVICE_PATH="$WORKSPACE/source/components/${COMPONENT_NAME}/base/service.yaml"
+                if [[ ! -s ${SERVICE_PATH} ]]; then
+                  echo "File empty or does not exist: ${SERVICE_PATH}"
+                  continue
+                fi
+
+                SERVICE_PORT=$(yq '.spec.ports[0].port' ${SERVICE_PATH})
+                if [[ -z ${SERVICE_PORT} ]]; then
+                  echo "Value undefined: .spec.ports[0].port in ${SERVICE_PATH}"
+                  continue
+                fi
+
+                API_BASE_URL="http://${RHDH_K8_ID}.${RHDH_K8_NS}.svc:${SERVICE_PORT}"
+              else
+                API_BASSE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
+              fi
+
+              for env_kind in ${ARRAY_ENV[@]}; do
+                jq --arg ref_api "appapi:${COMPONENT_NAME}" \
+                  --arg service_name ${COMPONENT_NAME} \
+                  --arg api_base_url ${API_BASE_URL} \
+                  --arg api_exposure ${API_EXPOSURE} \
+                  --arg ref_container "container:${COMPONENT_NAME}" \
+                  --arg image_name ${IMAGE_NAME} '
+                    .services += [
+                      { "bom-ref": $ref_api,
+                        "namme": $service_name,
+                        "properties": [
+                          { "name": "base_url",
+                            "value": $api_base_url
+                          },
+                          { "name": "network_exposure",
+                            "value": $api_exposure
+                          }
+                        ]
+                      }
+                    ] |
+                    .dependencies += [
+                      { "ref": $ref_container,
+                        "dependsOn": [
+                          $ref_api
+                        ]
+                      }
+                    ]
+                ' ${DEPLOY_SBOM} > $tempfile
+                cp $tempfile ${DEPLOY_SBOM}
+              done
               jq . ${DEPLOY_SBOM}
-              
+
               ###
               # Upload ConcertDef DEPLOY Inventory SBOM
               #

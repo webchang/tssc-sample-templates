@@ -16,12 +16,20 @@ spec:
       name: target-branch
       type: string
     - default: "false"
-      description: Indicator for Concert enablement
+      description: Optional Concert enablement setting for generating and uploading ConcertDef files.  Default is "false".
       name: if-concert-enabled
       type: string
     - default: "1.0.0"
-      description: Concert component version for the build
+      description: Optional Concert setting for the ConcertDef component version.  Default is "1.0.0".
       name: concert-component-version
+      type: string
+    - default: ""
+      description: Optional Concert setting for the base DOMAIN of the API service.  When the value is an empty string, it will be "{serviceName.nameSpace.svc}" per the Kubernetes service name and namespace in use.
+      name: concert-api-base
+      type: string
+    - default: "private"
+      description: Optional Concert setting for the API exposure.
+      name: concert-api-exposure
       type: string
   tasks:
     - name: clone-repository
@@ -54,6 +62,10 @@ spec:
           value: $(params.if-concert-enabled)
         - name: concert-component-version
           value: $(params.concert-component-version)
+        - name: concert-api-base
+          value: $(params.concert-api-base)
+        - name: concert-api-exposure
+          value: $(params.concert-api-exposure)
       runAfter:
         - clone-repository
       taskRef:
