@@ -153,12 +153,12 @@ spec:
           ARRAY_ENV=("${ARRAY_ENV[@]/development}")
 
           DEV_PATCH_PATH="${OV_PATH}/development/deployment-patch.yaml"
-          DEV_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${DEV_PATCH_PATH}
+          DEV_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${DEV_PATCH_PATH})
           echo "development last update timestamp: ${DEV_TIMESTAMP}"
 
           for env_kind in ${ARRAY_ENV[@]}; do
             X_PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
-            X_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${X_PATCH_PATH}
+            X_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${X_PATCH_PATH})
             echo "${env_kind} last update timestamp: ${X_TIMESTAMP}"
 
             if [[ ${X_TIMESTAMP} > ${DEV_TIMESTAMP} ]]; then
