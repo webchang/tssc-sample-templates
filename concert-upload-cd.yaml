@@ -125,6 +125,10 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "git diff --name-only HEAD HEAD@{1}"
+        git diff --name-only HEAD HEAD@{1}
+        echo "------"
+
         echo "========="
         echo "git rev-parse HEAD | cut -c -7"
         git rev-parse HEAD | cut -c -7
