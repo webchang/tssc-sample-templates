@@ -321,9 +321,9 @@ spec:
               continue
             fi
 
-            API_BASE_URL="http://${RHDH_K8_ID}.${RHDH_K8_NS}.svc:${SERVICE_PORT}"
+            API_BASE_URL="http://${RHDH_K8_ID}-${RHDH_K8_NS}.svc:${SERVICE_PORT}"
           else
-            API_BASE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
+            API_BASE_URL="https://${RHDH_K8_ID}-${RHDH_K8_NS}.${API_BASE}"
           fi
 
           jq --arg ref_api appapi:${COMPONENT_NAME} \
