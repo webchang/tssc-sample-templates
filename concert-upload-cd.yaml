@@ -259,7 +259,6 @@ spec:
                 echo "Empty file: ${DEPLOY_SBOM}"
                 exit 1
               fi
-              jq . ${DEPLOY_SBOM}
 
               ###
               # Add service and dependency objects
@@ -279,29 +278,23 @@ spec:
 
                 API_BASE_URL="http://${RHDH_K8_ID}.${RHDH_K8_NS}.svc:${SERVICE_PORT}"
               else
-                API_BASSE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
+                API_BASE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
               fi
 
-              echo "appapi:${COMPONENT_NAME}"
-              echo "COMPONENT_NAME: ${COMPONENT_NAME}"
-              echo "API_BASE_URL: ${API_BASE_URL}"
-              echo "API_EXPOSURE: ${API_EXPOSURE}"
-              echo "container:${IMAGE_NAME}"
-
               jq --arg ref_api appapi:${COMPONENT_NAME} \
-                --arg net_exposure ${API_EXPOSURE} \
                 --arg service_name ${COMPONENT_NAME} \
-                --arg base_url ${API_BASE_URL} \
+                --arg api_base_url ${API_BASE_URL} \
+                --arg api_exposure ${API_EXPOSURE} \
                 --arg ref_container container:${IMAGE_NAME} '
                   .services += [
                     { "bom-ref": $ref_api,
                       "namme": $service_name,
                       "properties": [
                         { "name": "base_url",
-                          "value": $base_url
+                          "value": $api_base_url
                         },
                         { "name": "network_exposure",
-                          "value": $net_exposure
+                          "value": $api_exposure
                         }
                       ]
                     }
