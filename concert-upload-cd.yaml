@@ -281,11 +281,12 @@ spec:
                 API_BASSE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
               fi
 
-              jq --arg ref_api "appapi:${COMPONENT_NAME}" \
+              echo "API exposure: ${API_EXPOSURE}"
+              jq --arg ref_api appapi:${COMPONENT_NAME} \
                 --arg service_name ${COMPONENT_NAME} \
                 --arg api_base_url ${API_BASE_URL} \
                 --arg api_exposure ${API_EXPOSURE} \
-                --arg ref_container "container:${IMAGE_NAME}" '
+                --arg ref_container container:${IMAGE_NAME} '
                   .services += [
                     { "bom-ref": $ref_api,
                       "namme": $service_name,
