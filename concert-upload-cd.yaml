@@ -121,91 +121,69 @@ spec:
         COMPONENT_NAME=$(yq '.metadata.name' ${GITOPS_APP_OF_APP})
 
         ###
-        # Discover updated images in the latest commit
-        #
+        # Discover qualified deployment patch files
+        ###
+
         cd $WORKSPACE/source
+        OV_PATH="components/${COMPONENT_NAME}/overlays"
+        readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
 
-        echo "git diff --name-only HEAD HEAD@{1}"
-        git diff --name-only HEAD HEAD@{1}
-        echo "------"
+        PATCH_PATH_FILE=$(mktemp)
 
-        echo "========="
-        echo "git rev-parse HEAD | cut -c -7"
-        git rev-parse HEAD | cut -c -7
-        echo "------"
-
-        echo "git log --oneline components/py3svc/overlays/development/deployment-patch.yaml | head -n 1 | cut -c -7"
-        git log --oneline components/py3svc/overlays/development/deployment-patch.yaml | head -n 1 | cut -c -7
-        echo "......"
-        echo "git log -n 1 components/py3svc/overlays/development/deployment-patch.yaml"
-        git log -n 1 components/py3svc/overlays/development/deployment-patch.yaml
-        echo "------"
-
-        echo "git log --oneline components/py3svc/overlays/stage/deployment-patch.yaml | head -n 1 | cut -c -7"
-        git log --oneline components/py3svc/overlays/stage/deployment-patch.yaml | head -n 1 | cut -c -7
-        echo "......"
-        echo "git log -n 1 components/py3svc/overlays/stage/deployment-patch.yaml"
-        git log -n 1 components/py3svc/overlays/stage/deployment-patch.yaml
-        echo "------"
-
-        echo "git log --oneline components/py3svc/overlays/prod/deployment-patch.yaml | head -n 1 | cut -c -7"
-        git log --oneline components/py3svc/overlays/prod/deployment-patch.yaml | head -n 1 | cut -c -7
-        echo "......"
-        echo "git log -n 1 components/py3svc/overlays/prod/deployment-patch.yaml"
-        git log -n 1 components/py3svc/overlays/prod/deployment-patch.yaml
-        echo "------"
-
-        exit 0
-
-        # Discover the commit messages for the gitops repo 
-        #   that match the pattern "^ *Update.*image", which is
-        #   used by the RHTAP push pipeline for the source repo.
+        # Discover updated images in terms of the commit messages
+        # automatically created by the source repo push pipeline.
         #
-        IMG_FILE=$(mktemp)
+        IMAGE_URI_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*image" \
-          | sed 's/^.*: //' | tee ${IMG_FILE}
+          | sed 's/^.*: //' | tee ${IMAGE_URI_FILE}
 
-        # Discover candidate deployment patch files for the commit
-        #
-        PATCH_FILE=$(mktemp)
-        if [[ -s ${IMG_FILE} ]]; then
+        sort ${IMAGE_URI_FILE} | uniq > $tempfile
+        cp $tempfile ${IMAGE_URI_FILE}
+
+        if [[ -s ${IMAGE_URI_FILE} ]]; then
+          ###
+          # Discover candidate deployment patch files
+          #
+          PATCH_PATH_FILE_RAW=$(mktemp)
           git log --pretty=format: --name-only -n 1 HEAD \
             | grep "^components/${COMPONENT_NAME}/.*-patch.yaml" \
-            | tee ${PATCH_FILE}
+            | tee ${PATCH_PATH_FILE_RAW}
+
+          PATCH_PATH_FILE_RAW_ARRAY=()
+          while IFS= read -r patch_path; do
+            PATCH_PATH_FILE_RAW_ARRAY+=("${patch_path}")
+          done < ${PATCH_PATH_FILE_RAW}
+
+          ###
+          # Discover qualified deployment patch files by committed images
+          #
+          while IFS= read -r image_uri; do
+            for patch_path in "${PATCH_PATH_FILE_RAW_ARRAY[@]}"; do
+              if [[ ! -z "$(grep "$image_uri}" ${patch_path})" ]]; then
+                if [[ ! -z $(yq '.spec.template.spec.containers[0].image' ${patch_path}) ]]; then
+                  echo "${patch_path}" >> ${PATCH_PATH_FILE}
+                fi
+              fi
+            done
+          done < ${IMAGE_URI_FILE}
         else
           ###
-          # The deployment patch file for develoment 
-          # was not updated via a "push" to the source code repo.
+          # Discover the updated deployment patch files of this commit
+          # by 7-digit file commit ids.  In order to accommodate
+          # current implementation of the task "clone-repository", 
+          # git clone depth was set to 2 to pipeline "gitops-push",
           #
-          # Discover the deployment patch files that are updated after
-          # the latest modifiation timestamp of the development's.
-          #
-          OV_PATH="components/${COMPONENT_NAME}/overlays"
-          readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
-          ARRAY_ENV=("${ARRAY_ENV[@]/development}")
-
-          DEV_PATCH_PATH="${OV_PATH}/development/deployment-patch.yaml"
-          DEV_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${DEV_PATCH_PATH})
-          echo "development last update timestamp: ${DEV_TIMESTAMP}"
-
+          HEAD_ID=$(git rev-parse HEAD | cut -c -7)
           for env_kind in ${ARRAY_ENV[@]}; do
-            X_PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
-            X_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${X_PATCH_PATH})
-            echo "${env_kind} last update timestamp: ${X_TIMESTAMP}"
-
-            if [[ ${X_TIMESTAMP} > ${DEV_TIMESTAMP} ]]; then
-              echo "include ${X_PATCH_PATH}"
-              X_IMAGE=$(yq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
-              echo "${X_IMAGE}" >> ${IMG_FILE}
-              echo "${X_PATCH_PATH}" >> ${PATCH_FILE}
+            patch_id=$(git log --oneline ${OV_PATH}/${env_kind}/deployment-patch.yaml | head -n 1 | cut -c -7)
+            if [[ ${patch_id} == ${HEAD_ID} ]]; then
+              PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
+              echo "${PATCH_PATH}" >> ${PATCH_PATH_FILE}
             fi
           done
         fi
 
-        if [[ -s ${PATCH_FILE} ]]; then
-          sort ${IMG_FILE} | uniq > $tempfile
-          cp $tempfile ${IMG_FILE}
-        else
+        if [[ ! -s ${PATCH_PATH_FILE} ]]; then
           echo "No deployment patch files were changed"
           echo "No need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM"
           exit 0
@@ -213,201 +191,190 @@ spec:
 
         ###
         # Generate and upload one ConcertDef Deploy Inventory SBOM
-        # for each updated patch file.
+        # for each updated patch file
         ###
 
-        PATCH_ARRAY=()
-        while IFS= read -r patch_yaml; do
-          PATCH_ARRAY+=("${patch_yaml}")
-        done < ${PATCH_FILE}
+        while IFS= read -r patch_path; do
+          ###
+          # Discover deployment environments type and image URI & name (path+tag)
+          #
+          ENV_TYPE=$(echo "${patch_path}" | cut -d '/' -f 4)
 
-        while IFS= read -r img_url; do
-          for patch_yaml in "${PATCH_ARRAY[@]}"; do
-            patch_path="$WORKSPACE/source/${patch_yaml}"
-            if [[ ! -z "$(grep "${img_url}" ${patch_path})" ]]; then
-              echo "*** Changed patch file: ${patch_path}"
+          IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${patch_path})
+          IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 1)
+          if [[ -z ${IMAGE_NAME} ]]; then
+            echo "encourntered an empty image name, continue"
+            continue
+          fi
 
-              ###
-              # Discover deployment environments type and image URI & name (path+tag)
-              #
-              ENV_TYPE=$(echo "${patch_yaml}" | cut -d '/' -f 4)
+          ###
+          # Discover environment-dependent template of app component instnace  
+          #
+          if [[ ${ENV_TYPE} == "development" ]]; then
+            if [[ -s app-of-apps/application-dev.yaml ]]; then
+              APP_DEF_PATH="app-of-apps/application-dev.yaml"
+            elif [ -s app-of-apps/application-development.yaml ]]; then
+              APP_DEF_PATH="app-of-apps/application-development.yaml"
+            else
+              echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
+              continue
+            fi
+          elif [[ -s app-of-apps/application-${ENV_TYPE}.yaml ]]; then
+            APP_DEF_PATH="app-of-apps/application-${ENV_TYPE}.yaml"
+          else
+            echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
+            continue
+          fi
+          echo "GitOps app-of-apps component instance template: ${APP_DEF_PATH}"
 
-              IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${patch_path})
-              IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 1)
-              if [[ -z ${IMAGE_NAME} ]]; then
-                echo "encourntered an empty image name, continue"
-                continue
-              fi
+          ###
+          # Generate ConcertDef Deploy Inventory SBOM
+          #
+          DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
+          CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
 
-              ###
-              # Discover environment-dependent template of app component instnace  
-              #
-              if [[ ${ENV_TYPE} == "development" ]]; then
-                if [[ -s $WORKSPACE/source/app-of-apps/application-dev.yaml ]]; then
-                  APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-dev.yaml"
-                elif [ -s $WORKSPACE/source/app-of-apps/application-development.yaml ]]; then
-                  APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-development.yaml"
-                else
-                  echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
-                  continue
-                fi
-              elif [[ -s $WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml ]]; then
-                APP_DEF_YAML="$WORKSPACE/source/app-of-apps/application-${ENV_TYPE}.yaml"
-              else
-                echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
-                continue
-              fi
-              echo "GitOps app-of-apps component instance template: ${APP_DEF_YAML}"
+          RHDH_APP_INSTANCE=$(yq '.metadata.name' ${APP_DEF_PATH})
+          RHDH_K8_ID=${COMPONENT_NAME}
+          RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_PATH})
+          RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_PATH})
 
-              ###
-              # Generate ConcertDef Deploy Inventory SBOM
-              #
-              DEPLOY_SBOM=$WORKSPACE/concert/${COMPONENT_NAME}-deploy.json
-              CODE_COMPONENT_NAME=$(basename ${SOURCE_URL})
-
-              RHDH_APP_INSTANCE=$(yq '.metadata.name' ${APP_DEF_YAML})
-              RHDH_K8_ID=${COMPONENT_NAME}
-              RHDH_K8_NS=$(yq '.spec.destination.namespace' ${APP_DEF_YAML})
-              RHDH_K8_SERVER=$(yq '.spec.destination.server' ${APP_DEF_YAML})
-
-              ###
-              # Initialize deploy inventory SBOM with a container object
-              #
-              jq --arg timestamp ${TIMESTAMP} \
-                --arg app_env ${RHDH_APP_INSTANCE} \
-                --arg component_name ${COMPONENT_NAME} \
-                --arg component_version ${COMPONENT_VERSION} \
-                --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
-                --arg code_name ${CODE_COMPONENT_NAME} \
-                --arg code_purl ${SOURCE_URL} \
-                --arg code_commit ${SOURCE_COMMIT} \
-                --arg runtime_component_name ${RHDH_APP_INSTANCE} \
-                --arg api_server ${RHDH_K8_SERVER} \
-                --arg cluster_id ${RHDH_K8_ID} \
-                --arg k8ns ${RHDH_K8_NS} \
-                --arg image_name ${IMAGE_NAME} \
-                --arg image_uri ${IMAGE_URI} '
-                  { "bomFormat": "ConcertDef",
-                    "specVersion": "1.0.2",
-                    "metadata": {
-                      "timestamp": $timestamp,
-                      "type": "deploy",
-                      "environment": $app_env,
-                      "component": {
-                        "name": $component_name,
-                        "version": $component_version,
-                        "deploy-number": $deploy_number
-                      }
-                    },
-                    "components": [
-                      { "type": "code",
-                        "name": $code_name,
-                        "purl": $code_purl,
-                        "commit_sha": $code_commit
+          ###
+          # Initialize deploy inventory SBOM with a container object
+          #
+          jq --arg timestamp ${TIMESTAMP} \
+            --arg app_env ${RHDH_APP_INSTANCE} \
+            --arg component_name ${COMPONENT_NAME} \
+            --arg component_version ${COMPONENT_VERSION} \
+            --arg deploy_number ${SOURCE_COMMIT_TIMESTAMP} \
+            --arg code_name ${CODE_COMPONENT_NAME} \
+            --arg code_purl ${SOURCE_URL} \
+            --arg code_commit ${SOURCE_COMMIT} \
+            --arg runtime_component_name ${RHDH_APP_INSTANCE} \
+            --arg api_server ${RHDH_K8_SERVER} \
+            --arg cluster_id ${RHDH_K8_ID} \
+            --arg k8ns ${RHDH_K8_NS} \
+            --arg image_name ${IMAGE_NAME} \
+            --arg image_uri ${IMAGE_URI} '
+              { "bomFormat": "ConcertDef",
+                "specVersion": "1.0.2",
+                "metadata": {
+                  "timestamp": $timestamp,
+                  "type": "deploy",
+                  "environment": $app_env,
+                  "component": {
+                    "name": $component_name,
+                    "version": $component_version,
+                    "deploy-number": $deploy_number
+                  }
+                },
+                "components": [
+                  { "type": "code",
+                    "name": $code_name,
+                    "purl": $code_purl,
+                    "commit_sha": $code_commit
+                  }
+                ],
+                "runtime-components": [
+                  { "type": "kubernetes",
+                    "name": $app_env,
+                    "api-server": $api_server,
+                    "properties": [
+                      {
+                        "name": "cluster_id",
+                        "value": $cluster_id
                       }
                     ],
-                    "runtime-components": [
-                      { "type": "kubernetes",
-                        "name": $app_env,
-                        "api-server": $api_server,
-                        "properties": [
-                          {
-                            "name": "cluster_id",
-                            "value": $cluster_id
-                          }
-                        ],
+                    "components": [
+                      { "type": "namespace",
+                        "name": $k8ns,
                         "components": [
-                          { "type": "namespace",
-                            "name": $k8ns,
-                            "components": [
-                              { "bom-red": "container:$image_name",
-                                "type": "container",
-                                "name": $image_name,
-                                "uri": $image_uri
-                              }
-                            ]
+                          { "bom-red": "container:$image_name",
+                            "type": "container",
+                            "name": $image_name,
+                            "uri": $image_uri
                           }
                         ]
                       }
                     ]
                   }
-              ' -n > ${DEPLOY_SBOM}
-              if [ ! -s ${DEPLOY_SBOM} ]; then
-                echo "Empty file: ${DEPLOY_SBOM}"
-                exit 1
-              fi
+                ]
+              }
+          ' -n > ${DEPLOY_SBOM}
+          if [ ! -s ${DEPLOY_SBOM} ]; then
+            echo "Empty file: ${DEPLOY_SBOM}"
+            exit 1
+          fi
 
-              ###
-              # Add service and dependency objects
-              #
-              if [[ $API_BASE == "" ]]; then
-                SERVICE_PATH="$WORKSPACE/source/components/${COMPONENT_NAME}/base/service.yaml"
-                if [[ ! -s ${SERVICE_PATH} ]]; then
-                  echo "File empty or does not exist: ${SERVICE_PATH}"
-                  continue
-                fi
+          ###
+          # Add service and dependency objects
+          #
+          if [[ $API_BASE == "" ]]; then
+            SERVICE_PATH="$WORKSPACE/source/components/${COMPONENT_NAME}/base/service.yaml"
+            if [[ ! -s ${SERVICE_PATH} ]]; then
+              echo "File empty or does not exist: ${SERVICE_PATH}"
+              continue
+            fi
 
-                SERVICE_PORT=$(yq '.spec.ports[0].port' ${SERVICE_PATH})
-                if [[ -z ${SERVICE_PORT} ]]; then
-                  echo "Value undefined: .spec.ports[0].port in ${SERVICE_PATH}"
-                  continue
-                fi
+            SERVICE_PORT=$(yq '.spec.ports[0].port' ${SERVICE_PATH})
+            if [[ -z ${SERVICE_PORT} ]]; then
+              echo "Value undefined: .spec.ports[0].port in ${SERVICE_PATH}"
+              continue
+            fi
 
-                API_BASE_URL="http://${RHDH_K8_ID}.${RHDH_K8_NS}.svc:${SERVICE_PORT}"
-              else
-                API_BASE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
-              fi
+            API_BASE_URL="http://${RHDH_K8_ID}.${RHDH_K8_NS}.svc:${SERVICE_PORT}"
+          else
+            API_BASE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
+          fi
 
-              jq --arg ref_api appapi:${COMPONENT_NAME} \
-                --arg service_name ${COMPONENT_NAME} \
-                --arg api_base_url ${API_BASE_URL} \
-                --arg api_exposure ${API_EXPOSURE} \
-                --arg ref_container container:${IMAGE_NAME} '
-                  .services += [
-                    { "bom-ref": $ref_api,
-                      "namme": $service_name,
-                      "properties": [
-                        { "name": "base_url",
-                          "value": $api_base_url
-                        },
-                        { "name": "network_exposure",
-                          "value": $api_exposure
-                        }
-                      ]
-                    }
-                  ] |
-                  .dependencies += [
-                    { "ref": $ref_container,
-                      "dependsOn": [
-                        $ref_api
-                      ]
+          jq --arg ref_api appapi:${COMPONENT_NAME} \
+            --arg service_name ${COMPONENT_NAME} \
+            --arg api_base_url ${API_BASE_URL} \
+            --arg api_exposure ${API_EXPOSURE} \
+            --arg ref_container container:${IMAGE_NAME} '
+              .services += [
+                { "bom-ref": $ref_api,
+                  "namme": $service_name,
+                  "properties": [
+                    { "name": "base_url",
+                      "value": $api_base_url
+                    },
+                    { "name": "network_exposure",
+                      "value": $api_exposure
                     }
                   ]
-              ' ${DEPLOY_SBOM} > $tempfile
-              cp $tempfile ${DEPLOY_SBOM}
-              jq . ${DEPLOY_SBOM}
+                }
+              ] |
+              .dependencies += [
+                { "ref": $ref_container,
+                  "dependsOn": [
+                    $ref_api
+                  ]
+                }
+              ]
+          ' ${DEPLOY_SBOM} > $tempfile
+          cp $tempfile ${DEPLOY_SBOM}
+          jq . ${DEPLOY_SBOM}
 
-              ###
-              # Upload ConcertDef DEPLOY Inventory SBOM
-              #
-              UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
-              AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
-              AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
-              curl -X POST -sS "${UPLOAD_URL}" \
-                -H 'accept: application/json' \
-                -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
-                -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
-                -H 'Content-Type: multipart/form-data' \
-                -F "data_type=application_sbom" \
-                -F "filename=@${DEPLOY_SBOM}" \
-                2>&1 > $tempfile
+          ###
+          # Upload ConcertDef DEPLOY Inventory SBOM
+          #
+          UPLOAD_URL=$(cat ${WORKSPACE_CONCERT_API}/endpoint-url)/ingestion/api/v1/upload_files
+          AUTH_TYPE=$(cat ${WORKSPACE_CONCERT_API}/key-type)
+          AUTH_KEY=$(cat ${WORKSPACE_CONCERT_API}/key-value)
+          curl -X POST -sS "${UPLOAD_URL}" \
+            -H 'accept: application/json' \
+            -H "InstanceID: $(cat ${WORKSPACE_CONCERT_API}/instance-id)" \
+            -H "Authorization: ${AUTH_TYPE} ${AUTH_KEY}" \
+            -H 'Content-Type: multipart/form-data' \
+            -F "data_type=application_sbom" \
+            -F "filename=@${DEPLOY_SBOM}" \
+            2>&1 > $tempfile
 
-              if [[ $? == 0 ]]; then
-                echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
-              else
-                echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
-                cat $tempfile
-              fi
-            fi
-          done
-        done < ${IMG_FILE}
+          if [[ $? == 0 ]]; then
+            echo "Successfully uploaded ConcertDef Deploy Inventory SBOM to Concert"
+          else
+            echo "Failed to upload ConcertDef Deploy Inventory SBOM to Concert"
+            cat $tempfile
+          fi
+    
+        done < ${PATCH_PATH_FILE}
