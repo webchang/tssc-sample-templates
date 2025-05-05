@@ -125,19 +125,56 @@ spec:
         #
         cd $WORKSPACE/source
 
+        # Discover the commit messages for the gitops repo 
+        #   that match the pattern "^ *Update.*image", which is
+        #   used by the RHTAP push pipeline for the source repo.
+        #
         IMG_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*image" \
           | sed 's/^.*: //' | tee ${IMG_FILE}
-        if [[ ! -s ${IMG_FILE} ]]; then
+
+        # Discover candidate deployment patch files for the commit
+        #
+        PATCH_FILE=$(mktemp)
+        if [[ -s ${IMG_FILE} ]]; then
+          git log --pretty=format: --name-only -n 1 HEAD \
+            | grep "^components/${COMPONENT_NAME}/.*-patch.yaml" \
+            | tee ${PATCH_FILE}
+        else
+          ###
+          # The deployment patch file for develoment 
+          # was not updated via a "push" to the source code repo.
+          #
+          # Use the deployment patch file for development
+          # to discover updated deployment patch files.
+          #
+          OV_PATH="components/${COMPONENT_NAME}/overlays"
+          readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
+          ARRAY_ENV=("${ARRAY_ENV[@]/development}")
+
+          DEV_PATCH_PATH="${OV_PATH}/development/deployment-patch.yaml"
+          DEV_IMAGE=$(jq '.spec.template.spec.containers[0].image' ${DEV_PATCH_PATH})
+          echo "${DEV_IMAGE}" > ${IMG_FILE}
+
+          for env_kind in ${ARRAY_ENV[@]}; do
+            X_PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
+            X_IMAGE=$(jq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
+            if [[ ${X_IMAGE} != ${DEV_IMAGE} ]]; then
+              echo "${X_PATCH_PATH}" >> ${PATCH_FILE}
+            fi
+          done
+        fi
+
+        if [[ ! -s ${PATCH_FILE} ]]; then
           echo "No deployment patch files were changed"
           echo "No need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM"
           exit 0
         fi
 
-        PATCH_FILE=$(mktemp)
-        git log --pretty=format: --name-only -n 1 HEAD \
-          | grep "^components/${COMPONENT_NAME}/.*-patch.yaml" \
-          | tee ${PATCH_FILE}
+        ###
+        # Generate and upload one ConcertDef Deploy Inventory SBOM
+        # for each updated patch file.
+        ###
 
         PATCH_ARRAY=()
         while IFS= read -r patch_yaml; do
