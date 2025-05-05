@@ -284,18 +284,18 @@ spec:
               echo "API exposure: ${API_EXPOSURE}"
               jq --arg ref_api appapi:${COMPONENT_NAME} \
                 --arg service_name ${COMPONENT_NAME} \
-                --arg api_base_url ${API_BASE_URL} \
-                --arg api_exposure ${API_EXPOSURE} \
+                --arg base_url ${API_BASE_URL} \
+                --arg net_exposure ${API_EXPOSURE} \
                 --arg ref_container container:${IMAGE_NAME} '
                   .services += [
                     { "bom-ref": $ref_api,
                       "namme": $service_name,
                       "properties": [
                         { "name": "base_url",
-                          "value": $api_base_url
+                          "value": $base_url
                         },
                         { "name": "network_exposure",
-                          "value": $api_exposure
+                          "value": $net_exposure
                         }
                       ]
                     }
