@@ -145,27 +145,35 @@ spec:
           # The deployment patch file for develoment 
           # was not updated via a "push" to the source code repo.
           #
-          # Use the deployment patch file for development
-          # to discover updated deployment patch files.
+          # Discover the deployment patch files that are updated after
+          # the latest modifiation timestamp of the development's.
           #
           OV_PATH="components/${COMPONENT_NAME}/overlays"
           readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
           ARRAY_ENV=("${ARRAY_ENV[@]/development}")
 
           DEV_PATCH_PATH="${OV_PATH}/development/deployment-patch.yaml"
-          DEV_IMAGE=$(yq '.spec.template.spec.containers[0].image' ${DEV_PATCH_PATH})
-          echo "${DEV_IMAGE}" > ${IMG_FILE}
+          DEV_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${DEV_PATCH_PATH}
+          echo "development last update timestamp: ${DEV_TIMESTAMP}"
 
           for env_kind in ${ARRAY_ENV[@]}; do
             X_PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
-            X_IMAGE=$(yq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
-            if [[ ${X_IMAGE} != ${DEV_IMAGE} ]]; then
+            X_TIMESTAMP=$(git log -1 --pretty="format:%ct" ${X_PATCH_PATH}
+            echo "${env_kind} last update timestamp: ${X_TIMESTAMP}"
+
+            if [[ ${X_TIMESTAMP} > ${DEV_TIMESTAMP} ]]; then
+              echo "include ${X_PATCH_PATH}"
+              X_IMAGE=$(yq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
+              echo "${X_IMAGE}" >> ${IMG_FILE}
               echo "${X_PATCH_PATH}" >> ${PATCH_FILE}
             fi
           done
         fi
 
-        if [[ ! -s ${PATCH_FILE} ]]; then
+        if [[ -s ${PATCH_FILE} ]]; then
+          sort ${IMG_FILE} | uniq > $tempfile
+          cp $tempfile ${IMG_FILE}
+        else
           echo "No deployment patch files were changed"
           echo "No need to geneare and upload a ConcertDef DEPLOY INVENTORY SBOM"
           exit 0
