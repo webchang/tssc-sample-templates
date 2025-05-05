@@ -125,11 +125,34 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "========="
         echo "ensure git core.fileMode is set to false"
         git config -l
+        echo "------"
         git config --unset core.filemode
         git config core.filemode false
         git config -l
+        echo "========="
+
+        echo "========="
+        ls  -l components/py3svc/overlays/development
+        echo "------"
+        git log -1 --pretty="format:%ct" components/py3svc/overlays/development/deployment-patch.yaml
+        echo "..."
+        git log -2 --pretty="format:%ct" components/py3svc/overlays/development/deployment-patch.yaml
+        echo "========="
+        ls  -l components/py3svc/overlays/stage
+        echo "------"
+        git log -1 --pretty="format:%ct" components/py3svc/overlays/stage/deployment-patch.yaml
+        echo "..."
+        git log -2 --pretty="format:%ct" components/py3svc/overlays/stage/deployment-patch.yaml
+        echo "========="
+        ls  -l components/py3svc/overlays/prod
+        echo "------"
+        git log -1 --pretty="format:%ct" components/py3svc/overlays/prod/deployment-patch.yaml
+        echo "..."
+        git log -2 --pretty="format:%ct" components/py3svc/overlays/prod/deployment-patch.yaml
+        echo "========="
 
         # Discover the commit messages for the gitops repo 
         #   that match the pattern "^ *Update.*image", which is
