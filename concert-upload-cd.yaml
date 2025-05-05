@@ -126,57 +126,32 @@ spec:
         cd $WORKSPACE/source
 
         echo "========="
-        echo "ensure git core.fileMode is set to false"
-        git config -l
+        echo "git rev-parse HEAD | cut -c -7"
+        git rev-parse HEAD | cut -c -7
         echo "------"
-        git config --unset core.filemode
-        git config core.filemode false
-        git config -l
-        echo "========="
 
-        echo "========="
-        echo "git diff --name-only HEAD HEAD@{1}"
-        git diff --name-only HEAD HEAD@{1}
+        echo "git log --oneline components/py3svc/overlays/development/deployment-patch.yaml | head -n 1 | cut -c -7"
+        git log --oneline components/py3svc/overlays/development/deployment-patch.yaml | head -n 1 | cut -c -7
+        echo "......"
+        echo "git log -n 1 components/py3svc/overlays/development/deployment-patch.yaml"
+        git log -n 1 components/py3svc/overlays/development/deployment-patch.yaml
         echo "------"
-        echo "git diff HEAD HEAD@{1}"
-        git diff HEAD HEAD@{1}
-        echo "------"
-        echo "git diff"
-        git diff
-        echo "------"
-        echo "========="
 
-        echo "===> development"
-        ls  -l components/py3svc/overlays/development
+        echo "git log --oneline components/py3svc/overlays/stage/deployment-patch.yaml | head -n 1 | cut -c -7"
+        git log --oneline components/py3svc/overlays/stage/deployment-patch.yaml | head -n 1 | cut -c -7
+        echo "......"
+        echo "git log -n 1 components/py3svc/overlays/stage/deployment-patch.yaml"
+        git log -n 1 components/py3svc/overlays/stage/deployment-patch.yaml
         echo "------"
-        git log -1 --pretty="format:%ct" components/py3svc/overlays/development/deployment-patch.yaml
-        echo
-        git log -1 --format="%ad" -- components/py3svc/overlays/development/deployment-patch.yaml
-        echo
-        echo "..."
-        git log -2 --pretty="format:%ct" components/py3svc/overlays/development/deployment-patch.yaml
-        echo
-        echo "===> stage"
-        ls  -l components/py3svc/overlays/stage
+
+        echo "git log --oneline components/py3svc/overlays/prod/deployment-patch.yaml | head -n 1 | cut -c -7"
+        git log --oneline components/py3svc/overlays/prod/deployment-patch.yaml | head -n 1 | cut -c -7
+        echo "......"
+        echo "git log -n 1 components/py3svc/overlays/prod/deployment-patch.yaml"
+        git log -n 1 components/py3svc/overlays/prod/deployment-patch.yaml
         echo "------"
-        git log -1 --pretty="format:%ct" components/py3svc/overlays/stage/deployment-patch.yaml
-        echo
-        git log -1 --format="%ad" -- components/py3svc/overlays/stage/deployment-patch.yaml
-        echo
-        echo "..."
-        git log -2 --pretty="format:%ct" components/py3svc/overlays/stage/deployment-patch.yaml
-        echo
-        echo "===> prod"
-        ls  -l components/py3svc/overlays/prod
-        echo "------"
-        git log -1 --pretty="format:%ct" components/py3svc/overlays/prod/deployment-patch.yaml
-        echo
-        git log -1 --format="%ad" -- components/py3svc/overlays/prod/deployment-patch.yaml
-        echo
-        echo "..."
-        git log -2 --pretty="format:%ct" components/py3svc/overlays/prod/deployment-patch.yaml
-        echo
-        echo "========="
+
+        exit 0
 
         # Discover the commit messages for the gitops repo 
         #   that match the pattern "^ *Update.*image", which is
