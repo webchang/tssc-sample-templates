@@ -159,7 +159,7 @@ spec:
           #
           while IFS= read -r image_uri; do
             for patch_path in "${PATCH_PATH_FILE_RAW_ARRAY[@]}"; do
-              if [[ ! -z "$(grep "$image_uri}" ${patch_path})" ]]; then
+              if [[ ! -z "$(grep ${image_uri} ${patch_path})" ]]; then
                 if [[ ! -z $(yq '.spec.template.spec.containers[0].image' ${patch_path}) ]]; then
                   echo "${patch_path}" >> ${PATCH_PATH_FILE}
                 fi
