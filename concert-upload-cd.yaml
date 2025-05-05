@@ -281,36 +281,33 @@ spec:
                 API_BASSE_URL="https://${RHDH_K8_ID}.${RHDH_K8_NS}.${API_BASE}"
               fi
 
-              for env_kind in ${ARRAY_ENV[@]}; do
-                jq --arg ref_api "appapi:${COMPONENT_NAME}" \
-                  --arg service_name ${COMPONENT_NAME} \
-                  --arg api_base_url ${API_BASE_URL} \
-                  --arg api_exposure ${API_EXPOSURE} \
-                  --arg ref_container "container:${COMPONENT_NAME}" \
-                  --arg image_name ${IMAGE_NAME} '
-                    .services += [
-                      { "bom-ref": $ref_api,
-                        "namme": $service_name,
-                        "properties": [
-                          { "name": "base_url",
-                            "value": $api_base_url
-                          },
-                          { "name": "network_exposure",
-                            "value": $api_exposure
-                          }
-                        ]
-                      }
-                    ] |
-                    .dependencies += [
-                      { "ref": $ref_container,
-                        "dependsOn": [
-                          $ref_api
-                        ]
-                      }
-                    ]
-                ' ${DEPLOY_SBOM} > $tempfile
-                cp $tempfile ${DEPLOY_SBOM}
-              done
+              jq --arg ref_api "appapi:${COMPONENT_NAME}" \
+                --arg service_name ${COMPONENT_NAME} \
+                --arg api_base_url ${API_BASE_URL} \
+                --arg api_exposure ${API_EXPOSURE} \
+                --arg ref_container "container:${IMAGE_NAME}" '
+                  .services += [
+                    { "bom-ref": $ref_api,
+                      "namme": $service_name,
+                      "properties": [
+                        { "name": "base_url",
+                          "value": $api_base_url
+                        },
+                        { "name": "network_exposure",
+                          "value": $api_exposure
+                        }
+                      ]
+                    }
+                  ] |
+                  .dependencies += [
+                    { "ref": $ref_container,
+                      "dependsOn": [
+                        $ref_api
+                      ]
+                    }
+                  ]
+              ' ${DEPLOY_SBOM} > $tempfile
+              cp $tempfile ${DEPLOY_SBOM}
               jq . ${DEPLOY_SBOM}
 
               ###
