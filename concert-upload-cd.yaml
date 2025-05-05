@@ -125,6 +125,12 @@ spec:
         #
         cd $WORKSPACE/source
 
+        echo "ensure git core.fileMode is set to false"
+        git config -l
+        git config --unset core.filemode
+        git config core.filemode false
+        git config -l
+
         # Discover the commit messages for the gitops repo 
         #   that match the pattern "^ *Update.*image", which is
         #   used by the RHTAP push pipeline for the source repo.
