@@ -153,12 +153,12 @@ spec:
           ARRAY_ENV=("${ARRAY_ENV[@]/development}")
 
           DEV_PATCH_PATH="${OV_PATH}/development/deployment-patch.yaml"
-          DEV_IMAGE=$(jq '.spec.template.spec.containers[0].image' ${DEV_PATCH_PATH})
+          DEV_IMAGE=$(yq '.spec.template.spec.containers[0].image' ${DEV_PATCH_PATH})
           echo "${DEV_IMAGE}" > ${IMG_FILE}
 
           for env_kind in ${ARRAY_ENV[@]}; do
             X_PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
-            X_IMAGE=$(jq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
+            X_IMAGE=$(yq '.spec.template.spec.containers[0].image' "${X_PATCH_PATH}")
             if [[ ${X_IMAGE} != ${DEV_IMAGE} ]]; then
               echo "${X_PATCH_PATH}" >> ${PATCH_FILE}
             fi
