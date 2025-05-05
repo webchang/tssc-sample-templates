@@ -171,10 +171,7 @@ spec:
 
       if [ "${PARAM_VERBOSE}" = "true" ] ; then
         set -x
-      fi    
-
-      echo "globally set git core.fileMode to false"
-      git config --global core.fileMode false
+      fi
 
       if [ -n "${PARAM_GIT_INIT_IMAGE}" ]; then
         echo "WARNING: provided deprecated gitInitImage parameter has no effect."
