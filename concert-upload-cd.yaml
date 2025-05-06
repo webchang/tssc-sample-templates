@@ -175,10 +175,10 @@ spec:
           # git clone depth was set to 2 to pipeline "gitops-push",
           #
           HEAD_ID=$(git rev-parse HEAD | cut -c -7)
-          echo "HEAD_CD: ${HEAD_CD}"
+          echo "HEAD_ID: ${HEAD_ID}"
           for env_kind in ${ARRAY_ENV[@]}; do
             patch_id=$(git log --oneline ${OV_PATH}/${env_kind}/deployment-patch.yaml | head -n 1 | cut -c -7)
-            echo "path_id for ${env_kind}: ${path_id}"
+            echo "patch_id for ${env_kind}: ${patch_id}"
             if [[ ${patch_id} == ${HEAD_ID} ]]; then
               PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
               echo "${PATCH_PATH}" >> ${PATCH_PATH_FILE}
