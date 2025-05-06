@@ -121,6 +121,16 @@ spec:
         GITOPS_APP_OF_APP=$WORKSPACE/source/application.yaml
         COMPONENT_NAME=$(yq '.metadata.name' ${GITOPS_APP_OF_APP})
 
+        ###
+        # Discover qualified deployment patch files
+        ###
+
+        cd $WORKSPACE/source
+        OV_PATH="components/${COMPONENT_NAME}/overlays"
+        readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
+
+        PATCH_PATH_FILE=$(mktemp)
+
         echo "===> git log --oneline -n 2 HEAD"
         git log --oneline -n 2 HEAD
         echo "======"
@@ -134,16 +144,6 @@ spec:
           HEAD_ID=$(git rev-parse HEAD | cut -c -7)
         fi
         echo "HEAD_ID: ${HEAD_ID}"
-
-        ###
-        # Discover qualified deployment patch files
-        ###
-
-        cd $WORKSPACE/source
-        OV_PATH="components/${COMPONENT_NAME}/overlays"
-        readarray -t ARRAY_ENV < <(ls -1 ${OV_PATH})
-
-        PATCH_PATH_FILE=$(mktemp)
 
         # Discover updated images in terms of the commit messages
         # automatically created by the source repo push pipeline.
