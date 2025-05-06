@@ -78,7 +78,6 @@ spec:
           operator: notin
           values:
             - pull_request
-            - Merge Request
       workspaces:
         - name: concert-api
           workspace: concert-api
