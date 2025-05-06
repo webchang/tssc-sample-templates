@@ -63,6 +63,7 @@ spec:
           exit 0
         fi
 
+        echo "event type: ${EVENT_TYPE}"
         if [[ ${EVENT_TYPE} != "push" ]]; then
           echo "Skip concert-upload-ci since this pipelinerun was not triggered by a push event."
           exit 0
