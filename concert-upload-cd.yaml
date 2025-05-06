@@ -121,6 +121,20 @@ spec:
         GITOPS_APP_OF_APP=$WORKSPACE/source/application.yaml
         COMPONENT_NAME=$(yq '.metadata.name' ${GITOPS_APP_OF_APP})
 
+        echo "===> git log --oneline -n 2 HEAD"
+        git log --oneline -n 2 HEAD
+        echo "======"
+
+        echo "===> find out if commmit starts with Merge"
+        git log --oneline -n 1 HEAD | grep "^ *Merge" | tee $tempfile
+
+        if [[ -s $tempfile ]]; then
+          HEAD_ID=$(git log --oneline -n 2 HEAD | tail -1 | cut -d ' ' -f 1)
+        else
+          HEAD_ID=$(git rev-parse HEAD | cut -c -7)
+        fi
+        echo "HEAD_ID: ${HEAD_ID}"
+
         ###
         # Discover qualified deployment patch files
         ###
@@ -174,8 +188,6 @@ spec:
           # current implementation of the task "clone-repository", 
           # git clone depth was set to 2 to pipeline "gitops-push",
           #
-          HEAD_ID=$(git rev-parse HEAD | cut -c -7)
-          echo "HEAD_ID: ${HEAD_ID}"
           for env_kind in ${ARRAY_ENV[@]}; do
             patch_id=$(git log --oneline ${OV_PATH}/${env_kind}/deployment-patch.yaml | head -n 1 | cut -c -7)
             echo "patch_id for ${env_kind}: ${patch_id}"
@@ -192,6 +204,8 @@ spec:
           exit 0
         fi
 
+        exit 0
+        
         ###
         # Generate and upload one ConcertDef Deploy Inventory SBOM
         # for each updated patch file
