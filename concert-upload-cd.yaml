@@ -194,7 +194,7 @@ spec:
           for env_kind in ${ARRAY_ENV[@]}; do
             patch_path=${OV_PATH}/${env_kind}/deployment-patch.yaml
             patch_cid=$(git log --oneline -n 1 ${patch_path} | cut -d ' ' -f 1)
-            echo "patch_cid for ${patch_path}: ${patch_cid}"
+            # echo "patch_cid for ${patch_path}: ${patch_cid}"
             if [[ ${patch_cid} == ${HEAD_ID} ]]; then
               echo "${patch_path}" >> ${PATCH_PATH_FILE}
             fi
@@ -247,7 +247,7 @@ spec:
             echo "Applcation definition YAML for ${ENV_TYPE} could not be found, continue"
             continue
           fi
-          echo "GitOps app-of-apps component instance template: ${APP_DEF_PATH}"
+          # echo "GitOps app-of-apps component instance template: ${APP_DEF_PATH}"
 
           ###
           # Generate ConcertDef Deploy Inventory SBOM
