@@ -136,7 +136,7 @@ spec:
         #
         IMAGE_URI_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*image" \
-          | sed 's/^.*: //' | tee ${IMAGE_URI_FILE}
+          | sed 's/^.*: //' > ${IMAGE_URI_FILE}
 
         sort ${IMAGE_URI_FILE} | uniq > $tempfile
         cp $tempfile ${IMAGE_URI_FILE}
@@ -148,7 +148,7 @@ spec:
           PATCH_PATH_FILE_RAW=$(mktemp)
           git log --pretty=format: --name-only -n 1 HEAD \
             | grep "^components/${COMPONENT_NAME}/.*-patch.yaml" \
-            | tee ${PATCH_PATH_FILE_RAW}
+            > ${PATCH_PATH_FILE_RAW}
 
           PATCH_PATH_FILE_RAW_ARRAY=()
           while IFS= read -r patch_path; do
