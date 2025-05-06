@@ -41,7 +41,7 @@ spec:
         - name: fetchTags
           value: "true"
         - name: depth
-          value: "3"
+          value: "2"
       taskRef:
         name: git-clone
       workspaces:
