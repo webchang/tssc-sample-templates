@@ -115,6 +115,10 @@ spec:
       script: |
         #!/usr/bin/env bash
 
+        echo "======"
+        git log --raw -n 3 HEAD
+        echo "------"
+
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
