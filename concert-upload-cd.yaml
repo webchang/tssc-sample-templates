@@ -115,10 +115,6 @@ spec:
       script: |
         #!/usr/bin/env bash
 
-        echo "======"
-        git log --raw -n 3 HEAD
-        echo "------"
-
         tempfile=$(mktemp)
         TIMESTAMP=$(date -d "@${SOURCE_COMMIT_TIMESTAMP}" -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -138,6 +134,10 @@ spec:
         # Discover updated images in terms of the commit messages
         # automatically created by the source repo push pipeline.
         #
+        echo "======"
+        git log --raw -n 3 HEAD
+        echo "------"
+        
         IMAGE_URI_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*image" \
           | sed 's/^.*: //' | tee ${IMAGE_URI_FILE}
