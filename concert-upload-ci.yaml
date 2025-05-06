@@ -253,7 +253,6 @@ spec:
               ]
             }
         ' -n > ${BUILD_SBOM}
-        ls -l ${BUILD_SBOM}
 
         # Add BOM-LINK for the image CycloneDX SBOM
         #
