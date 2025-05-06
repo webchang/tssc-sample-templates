@@ -131,20 +131,6 @@ spec:
 
         PATCH_PATH_FILE=$(mktemp)
 
-        echo "===> git log --oneline -n 2 HEAD"
-        git log --oneline -n 2 HEAD
-        echo "======"
-
-        echo "===> find out if commmit starts with Merge"
-        git log --oneline -n 1 HEAD | grep "^ *Merge" | tee $tempfile
-
-        if [[ -s $tempfile ]]; then
-          HEAD_ID=$(git log --oneline -n 2 HEAD | tail -1 | cut -d ' ' -f 1)
-        else
-          HEAD_ID=$(git rev-parse HEAD | cut -c -7)
-        fi
-        echo "HEAD_ID: ${HEAD_ID}"
-
         # Discover updated images in terms of the commit messages
         # automatically created by the source repo push pipeline.
         #
@@ -187,13 +173,30 @@ spec:
           # by 7-digit file commit ids.  In order to accommodate
           # current implementation of the task "clone-repository", 
           # git clone depth was set to 2 to pipeline "gitops-push",
+          ###
+
+          # Discover the commit id of the effective "HEAD", since
+          # "git HEAD" may regard "Merge pull request" or "Merge branch"
+          #
+          echo "===> git log --oneline -n 2 HEAD"
+          git log --oneline -n 2 HEAD
+          echo "------"
+
+          log_line=$(git log --oneline -n 2 HEAD | head -1)
+          if [[ "Merge" == $(echo $log_line | cut -d ' ' -f 2) ]]; then
+            log_line=$(git log --oneline -n 2 HEAD | tail -1)       
+          fi
+          HEAD_ID=$(echo $log_line | cut -d ' ' -f 1)
+          echo "HEAD_ID: ${HEAD_ID}"
+
+          # Discover qualified patch file by commit ID
           #
           for env_kind in ${ARRAY_ENV[@]}; do
-            patch_id=$(git log --oneline ${OV_PATH}/${env_kind}/deployment-patch.yaml | head -n 1 | cut -c -7)
-            echo "patch_id for ${env_kind}: ${patch_id}"
-            if [[ ${patch_id} == ${HEAD_ID} ]]; then
-              PATCH_PATH="${OV_PATH}/${env_kind}/deployment-patch.yaml"
-              echo "${PATCH_PATH}" >> ${PATCH_PATH_FILE}
+            patch_path=${OV_PATH}/${env_kind}/deployment-patch.yaml
+            patch_cid=$(git log --oneline -n 1 ${patch_path} | cut -d ' ' -f 1)
+            echo "patch_cid for ${patch_path}: ${patch_cid}"
+            if [[ ${patch_cid} == ${HEAD_ID} ]]; then
+              echo "${patch_path}" >> ${PATCH_PATH_FILE}
             fi
           done
         fi
@@ -204,11 +207,13 @@ spec:
           exit 0
         fi
 
-        exit 0
+        echo "Qualified patch files:"
+        cat ${PATCH_PATH_FILE}
+        echo "------"
         
         ###
         # Generate and upload one ConcertDef Deploy Inventory SBOM
-        # for each updated patch file
+        # for each qualified patch file
         ###
 
         while IFS= read -r patch_path; do
