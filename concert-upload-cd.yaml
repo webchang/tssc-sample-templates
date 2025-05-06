@@ -134,10 +134,6 @@ spec:
         # Discover updated images in terms of the commit messages
         # automatically created by the source repo push pipeline.
         #
-        echo "======"
-        git log --raw -n 3 HEAD
-        echo "------"
-        
         IMAGE_URI_FILE=$(mktemp)
         git log --raw -n 1 HEAD | grep "^ *Update.*image" \
           | sed 's/^.*: //' | tee ${IMAGE_URI_FILE}
@@ -182,16 +178,16 @@ spec:
           # Discover the commit id of the effective "HEAD", since
           # "git HEAD" may regard "Merge pull request" or "Merge branch"
           #
-          echo "===> git log --oneline -n 2 HEAD"
-          git log --oneline -n 2 HEAD
-          echo "------"
+          # echo "===> git log --oneline -n 2 HEAD"
+          # git log --oneline -n 2 HEAD
+          # echo "------"
 
           log_line=$(git log --oneline -n 2 HEAD | head -1)
           if [[ "Merge" == $(echo $log_line | cut -d ' ' -f 2) ]]; then
             log_line=$(git log --oneline -n 2 HEAD | tail -1)       
           fi
           HEAD_ID=$(echo $log_line | cut -d ' ' -f 1)
-          echo "HEAD_ID: ${HEAD_ID}"
+          # echo "HEAD_ID: ${HEAD_ID}"
 
           # Discover qualified patch file by commit ID
           #
