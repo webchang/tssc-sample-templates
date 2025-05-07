@@ -161,7 +161,7 @@ spec:
           while IFS= read -r image_uri; do
             for patch_path in "${PATCH_PATH_FILE_RAW_ARRAY[@]}"; do
               if [[ ! -z "$(grep ${image_uri} ${patch_path})" ]]; then
-                if [[ ! -z $(yq '.spec.template.spec.containers[0].image' ${patch_path}) ]]; then
+                if [[ null != $(yq '.spec.template.spec.containers[0].image' ${patch_path}) ]]; then
                   echo "${patch_path}" >> ${PATCH_PATH_FILE}
                 fi
               fi
@@ -224,7 +224,7 @@ spec:
 
           IMAGE_URI=$(yq '.spec.template.spec.containers[0].image' ${patch_path})
           IMAGE_NAME=$(echo ${IMAGE_URI} | cut -d '@' -f 1)
-          if [[ -z ${IMAGE_NAME} ]]; then
+          if [[ -z "${IMAGE_NAME}" ]]; then
             echo "encourntered an empty image name, continue"
             continue
           fi
@@ -330,6 +330,14 @@ spec:
           ###
           # Add service and dependency objects
           #
+          API_BASE_PATH="/"
+          ROUTE_PATH="$WORKSPACE/source/components/${COMPONENT_NAME}/base/route.yaml"
+          if [[ -s ${ROUTE_PATH} ]]; then
+            if [[ null != $(yq '.spec.path' ${ROUTE_PATH}) ]]; then
+              API_BASE_PATH=$(yq '.spec.path' ${ROUTE_PATH})
+            fi
+          fi
+
           if [[ $API_BASE == "" ]]; then
             SERVICE_PATH="$WORKSPACE/source/components/${COMPONENT_NAME}/base/service.yaml"
             if [[ ! -s ${SERVICE_PATH} ]]; then
@@ -338,14 +346,14 @@ spec:
             fi
 
             SERVICE_PORT=$(yq '.spec.ports[0].port' ${SERVICE_PATH})
-            if [[ -z ${SERVICE_PORT} ]]; then
+            if [[ null == ${SERVICE_PORT} ]]; then
               echo "Value undefined: .spec.ports[0].port in ${SERVICE_PATH}"
               continue
             fi
 
-            API_BASE_URL="http://${RHDH_K8_ID}-${RHDH_K8_NS}.svc:${SERVICE_PORT}"
+            API_BASE_URL="http://${RHDH_K8_ID}-${RHDH_K8_NS}.svc:${SERVICE_PORT}${API_BASE_PATH}"
           else
-            API_BASE_URL="https://${RHDH_K8_ID}-${RHDH_K8_NS}.${API_BASE}"
+            API_BASE_URL="https://${RHDH_K8_ID}-${RHDH_K8_NS}.${API_BASE}${API_BASE_PATH}"
           fi
 
           jq --arg ref_api appapi:${COMPONENT_NAME} \
